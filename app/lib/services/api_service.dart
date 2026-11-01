@@ -66,13 +66,14 @@ class ApiService {
         Map<String, dynamic>.from(response.data as Map));
   }
 
-  /// POST /v1/auth/register. Links [deviceId] (it must have uploaded once
-  /// and not be linked yet) and returns a signed-in session.
+  /// POST /v1/auth/register. Links [deviceId], proven by the [claimCode]
+  /// the device shows over paired BLE, and returns a signed-in session.
   Future<AuthSession> register(
       {required String fullName,
       required String nationalId,
       required String carPlate,
       required String deviceId,
+      required String claimCode,
       required String password}) async {
     final response = await _dio.post('/v1/auth/register', data: {
       'full_name': fullName.trim(),
@@ -80,6 +81,7 @@ class ApiService {
       'car_plate': carPlate.trim(),
       'device_id': deviceId.trim(),
       'password': password,
+      'claim_code': claimCode,
     });
     final json = Map<String, dynamic>.from(response.data as Map);
     return AuthSession.fromJson({...json, 'full_name': fullName.trim()});

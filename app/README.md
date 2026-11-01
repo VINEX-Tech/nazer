@@ -21,7 +21,7 @@ cd app
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs   # generates *.g.dart (Hive adapters)
 flutter analyze
-flutter test        # 64 tests
+flutter test        # 65 tests
 flutter run -d <android-device>   # BLE needs a real phone
 ```
 
@@ -38,8 +38,9 @@ In Settings:
 1. Server URL: the backend origin over HTTPS (Android blocks plain HTTP by default).
 2. Bluetooth pairing: enter the device's `BLE_PAIR_CODE`. Until it matches, the device ignores all
    commands and sends no data.
-3. Account: sign in, or create an account. Creating one links the device ID read over BLE (the device
-   must have uploaded to the server once).
+3. Account: sign in, or create an account. Creating one needs the device connected and paired: the
+   device sends its claim code only to a paired phone, and the server only links a device whose
+   claim code matches.
 
 ## Signing
 

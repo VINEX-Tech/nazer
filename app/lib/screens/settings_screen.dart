@@ -52,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             fullName: fullName!,
             nationalId: _nationalId.text,
             carPlate: carPlate!,
-            device: device.deviceId,
             password: _password.text);
       } else {
         await device.signIn(_nationalId.text, _password.text);
@@ -341,7 +340,7 @@ class _RegisterDialogState extends State<_RegisterDialog> {
         title: const Text('Create account'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           const Text(
-              'Uses the national ID, password and device ID entered in Settings.'),
+              'Uses the national ID and password entered in Settings, and links the device paired over Bluetooth.'),
           TextField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'Full name')),

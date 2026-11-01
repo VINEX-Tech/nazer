@@ -218,24 +218,34 @@ class DeviceProvider extends ChangeNotifier {
     }
   }
 
-  /// Creates a driver account linked to [device] and signs in.
+  /// Creates a driver account linked to the connected, paired device and
+  /// signs in. The device's claim code proves the phone holds the device.
   Future<void> register(
       {required String fullName,
       required String nationalId,
       required String carPlate,
-      required String device,
       required String password}) async {
+    final code = config?.claimCode, device = config?.deviceId ?? deviceId;
+    if (!isConnected || !paired || code == null || code.isEmpty) {
+      accountError =
+          'Connect and pair the device over Bluetooth before creating an account.';
+      _notify();
+      throw StateError(accountError!);
+    }
     try {
       await _saveSession(await _api.register(
           fullName: fullName,
           nationalId: nationalId,
           carPlate: carPlate,
           deviceId: device,
+          claimCode: code,
           password: password));
     } on DioException catch (e) {
       accountError = switch (e.response?.statusCode) {
-        404 => 'The server has not heard from this device yet.',
-        409 => 'This national ID or device is already registered.',
+        403 => 'The server did not accept this device. Check its key on the server.',
+        409 =>
+          'Could not register: the device is already linked or these details are in use.',
+        429 => 'Too many attempts. Wait a few minutes and retry.',
         422 => 'Check the fields. The password needs at least 8 characters.',
         _ => 'Could not reach the server. Check the server URL and retry.',
       };

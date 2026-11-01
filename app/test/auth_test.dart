@@ -42,6 +42,21 @@ class _RejectingApi extends FakeApi {
   }
 }
 
+class _RegisterApi extends FakeApi {
+  final calls = <Map<String, String>>[];
+  @override
+  Future<AuthSession> register(
+      {required String fullName,
+      required String nationalId,
+      required String carPlate,
+      required String deviceId,
+      required String claimCode,
+      required String password}) async {
+    calls.add({'device': deviceId, 'code': claimCode});
+    return AuthSession(token: 'tok-2', driverId: 3, deviceId: deviceId);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -69,8 +84,10 @@ void main() {
         nationalId: '12345678901234',
         carPlate: 'ABC 123',
         deviceId: 'NAZER_1',
+        claimCode: 'ABCDEF123456',
         password: 'secret-pass');
     expect(adapter.requests.last.path, '/v1/auth/register');
+    expect((adapter.requests.last.data as Map)['claim_code'], 'ABCDEF123456');
     expect((adapter.requests.last.data as Map)['full_name'], 'Driver');
     expect(created.token, 'tok-1');
     api.dispose();
@@ -156,6 +173,31 @@ void main() {
     ble.connections.add(BleConnectionEvent.disconnected);
     await tester.pump();
     expect(provider.paired, isFalse);
+    provider.dispose();
+  });
+
+  testWidgets('account creation needs a paired device and sends its claim code',
+      (tester) async {
+    final ble = FakeBle(), api = _RegisterApi()..signedIn = false;
+    final provider = DeviceProvider(ble: ble, api: api);
+    await provider.ready;
+    Future<void> create() => provider.register(
+        fullName: 'Driver',
+        nationalId: '12345678901234',
+        carPlate: 'ABC 1',
+        password: 'secret-pass');
+    await expectLater(create(), throwsStateError);
+    expect(provider.accountError, contains('pair'));
+    expect(api.calls, isEmpty);
+    ble.connections.add(BleConnectionEvent.connected);
+    await tester.pump();
+    ble.acceptNotification(utf8.encode('{"auth":"ok"}'));
+    ble.acceptNotification(utf8.encode(
+        '{"config":{"device_id":"NAZER_0B49EFD0","claim_code":"ABCDEF123456"}}'));
+    await tester.pump();
+    await create();
+    expect(api.calls.single, {'device': 'NAZER_0B49EFD0', 'code': 'ABCDEF123456'});
+    expect(provider.signedIn, isTrue);
     provider.dispose();
   });
 }
