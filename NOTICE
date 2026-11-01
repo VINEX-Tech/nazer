@@ -1,0 +1,38 @@
+Nazer
+Copyright (c) 2026 Abdel Rahman Madboly
+
+The source code in this repository is licensed under the MIT License (see LICENSE).
+The following parts are not covered by that licence.
+
+OpenStreetMap data
+------------------
+device/data/limits.bin is a road speed-limit pack derived from OpenStreetMap
+data covering Cairo, Ismailia and the road between them. It is built by
+platform/apps/api/scripts/build_speed_limits.py.
+
+  (c) OpenStreetMap contributors
+  https://www.openstreetmap.org/copyright
+
+OpenStreetMap data is available under the Open Database License (ODbL) 1.0:
+https://opendatacommons.org/licenses/odbl/1-0/
+
+limits.bin is a Derivative Database under the ODbL and is distributed under
+the ODbL 1.0, not under the MIT License. If you publicly use or redistribute
+it, or a database derived from it, you must keep this attribution and offer
+that database under the ODbL.
+
+The synthetic fixtures in device/test/host/ contain made-up roads and no
+OpenStreetMap data.
+
+Map tiles
+---------
+The app and the admin website display map tiles from tile.openstreetmap.org
+with the attribution "(c) OpenStreetMap contributors". Use of those tiles is
+subject to the OpenStreetMap Foundation tile usage policy:
+https://operations.osmfoundation.org/policies/tiles/
+Heavy or production use should switch to another tile provider.
+
+Third-party libraries
+---------------------
+Firmware, backend, website and app dependencies are fetched by their package
+managers (PlatformIO, pip, npm, pub) and keep their own licences.

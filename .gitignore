@@ -1,0 +1,25 @@
+# Root ignores. Each component (device/, platform/, app/, hardware/) has its
+# own .gitignore for build output and local secrets.
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
