@@ -1,0 +1,13 @@
+# Platform-level secrets. Each app under apps/ has its own .gitignore.
+.env
+.env.*
+!.env.example
+
+# Real TLS certs: never commit them, only the nginx config that references them
+nginx/certs/*
+!nginx/certs/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+

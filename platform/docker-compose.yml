@@ -1,0 +1,32 @@
+# Local/dev: run the containerized api + web directly, no TLS in front.
+# Running `uvicorn` and `npm run dev` natively (see each app's README) is
+# faster for day-to-day work. This file checks the built containers.
+# Secrets come from apps/api/.env (copy apps/api/.env.example).
+services:
+  api:
+    build:
+      context: ./apps/api
+    container_name: nazer-api
+    env_file:
+      - path: ./apps/api/.env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////app/data/nazer.db
+    ports:
+      - "8080:8080"
+    volumes:
+      - api-data:/app/data
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    container_name: nazer-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  api-data:

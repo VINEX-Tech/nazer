@@ -1,0 +1,52 @@
+# Server stack: api + web, each published on its own port.
+# This file has no TLS in front. Put a TLS proxy in front of the website and
+# of /v1/auth, /v1/app and /v1/admin before real use (nginx/nginx.conf is a
+# starting point). Only /v1/device/* has to stay on plain HTTP, because the
+# SIM800L modem cannot do TLS.
+services:
+  api:
+    build:
+      context: ./apps/api
+    container_name: nazer-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////app/data/nazer.db
+      NAZER_DEVICE_KEYS: ${NAZER_DEVICE_KEYS}
+      NAZER_TOKEN_SECRET: ${NAZER_TOKEN_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - api-data:/app/data
+    # Plain HTTP: the device's SIM800L posts here directly (it cannot do TLS).
+    ports:
+      - "8080:8080"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: nazer-web
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    depends_on:
+      - api
+    networks:
+      - internal
+
+volumes:
+  api-data:
+
+networks:
+  internal:
+    driver: bridge

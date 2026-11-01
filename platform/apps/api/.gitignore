@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Database: never commit the live DB or the built road index
+app/data/
+nazer.db
+*.db
+*.sqlite
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Alembic auto-generated (keep versions/ but ignore local state)
+alembic/versions/__pycache__/
+
+# Distribution / build
+dist/
+build/
+*.egg-info/

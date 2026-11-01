@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+.env.*
+!.env.example
+nazer.db
+*.db
+tests/
+.git/
+!app/data/speed_limits.sqlite
