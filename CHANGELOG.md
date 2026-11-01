@@ -3,6 +3,14 @@
 All notable changes to this project are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-01
+
+### Fixed
+
+- Firmware build on newer ESP32 toolchains: include `esp_mac.h` where the
+  chip ID is read, and pin the `espressif32` platform to 7.0.1 so CI and local
+  builds use the same toolchain.
+
 ## [0.1.0] - 2026-11-01
 
 First public prototype release. Firmware, backend, admin website, app and

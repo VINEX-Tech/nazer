@@ -5,6 +5,9 @@
 #include "Storage.h"
 #include <Preferences.h>
 #include <esp_efuse.h>
+#if __has_include(<esp_mac.h>)
+#include <esp_mac.h>  // esp_efuse_mac_get_default on newer ESP-IDF
+#endif
 
 // Global singleton: matches extern declaration in Storage.h
 StorageManager Storage;

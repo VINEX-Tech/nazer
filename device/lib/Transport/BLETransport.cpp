@@ -5,6 +5,9 @@
 #include "BLETransport.h"
 #include "Storage.h"
 #include <esp_random.h>
+#if __has_include(<esp_mac.h>)
+#include <esp_mac.h>  // esp_efuse_mac_get_default on newer ESP-IDF
+#endif
 
 // ---- Release builds must not ship the passkey placeholder ----
 #if defined(NAZER_RELEASE) && !NAZER_HAS_DISPLAY && ((BLE_PASSKEY) < 1 || (BLE_PASSKEY) > 999999)
