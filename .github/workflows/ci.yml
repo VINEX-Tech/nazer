@@ -84,7 +84,7 @@ jobs:
       - run: pip install platformio==6.1.19
       - name: Build firmware (main and bring-up)
         run: pio run
-      - name: Host checks (road limits, power policy, queue, BLE pairing)
+      - name: Host checks (road limits, power policy, queue, BLE pairing, claim answer)
         run: bash test/host/run_checks.sh
 
   secrets:

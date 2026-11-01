@@ -26,12 +26,17 @@ enclosure in one repository.
 - Backend: `/v1/admin/device/{live,track,events}` for the admin website.
 - App: sign-in and account creation in Settings, bearer token on tracking
   calls, BLE pairing code setting, clear 401 and 403 messages.
-- Device claim codes: `/v1/auth/register` needs the device's claim code
-  (HMAC of the device key), which the firmware sends only to a BLE-paired
-  phone in its config reply.
+- Device claim by challenge-response: `/v1/auth/claim-challenge` issues a
+  one-time nonce (120 s); the bonded device answers HMAC-SHA256(device key,
+  nonce || device ID) (`device/lib/Transport/ClaimResponse.h`, host-tested);
+  `/v1/auth/register` burns the nonce and checks the answer.
+- BLE LE Secure Connections with MITM protection and bonding, static passkey
+  `BLE_PASSKEY`, encrypted-only characteristic permissions. The app bonds
+  before subscribing on Android. Not yet tested on the board.
 - In-process rate limits on `/v1/auth/register` (5 per 10 min per IP) and
-  `/v1/auth/login` (10 per 5 min per IP), 429 with `Retry-After`.
-- 19 backend access-control tests, 7 app tests, 1 website test.
+  `/v1/auth/login` (10 per 5 min per IP) and `/v1/auth/claim-challenge`
+  (10 per 10 min per IP), 429 with `Retry-After`.
+- 23 backend access-control tests, 8 app tests, 1 website test, 2 host checks.
 - `include/config.h` falls back to `config.example.h`, so a fresh clone builds.
 - CI for firmware, host checks, API, website, app and secret scanning.
 - MIT licence, NOTICE for OpenStreetMap data, SECURITY.md.
@@ -63,11 +68,16 @@ enclosure in one repository.
 - BLE commands (speed limit, mode, emergency contacts, crash cancel) were
   accepted from any nearby phone. They now need the pairing code.
 - Anyone who knew a device ID could link that device to their own account.
-  Registration now needs the device's claim code, and the claim is a single
-  conditional update so two requests cannot both win (409 for the loser).
-- Registration said when a national ID was already registered. A wrong claim
-  code is now rejected first (403), and a taken ID and a linked device return
-  the same 409.
+  Registration now needs the device's answer to a single-use, expiring server
+  nonce, and the claim is a single conditional update so two requests cannot
+  both win (409 for the loser). An earlier draft of this release sent a
+  static claim code in a BLE notification that could be sniffed; it was
+  replaced by the challenge-response before the release.
+- BLE traffic, including the pairing code, was unencrypted. The link now
+  needs LE Secure Connections bonding with a passkey.
+- Registration said when a national ID was already registered. A bad claim
+  is now rejected first (403), and a taken ID and a linked device return the
+  same 409.
 - Event IDs were global, so one device could block or probe another's. An
   `event_id` must now start with the sending device's ID (403 otherwise).
 - Vehicle mode can no longer be changed by SMS (it sets the default limit).
