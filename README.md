@@ -96,3 +96,7 @@ See [SECURITY.md](SECURITY.md) for what is protected, what is not, and how to re
 Code: MIT, see [LICENSE](LICENSE). The road-limit pack `device/data/limits.bin` is derived from
 OpenStreetMap data under the ODbL; see [NOTICE](NOTICE). Map tiles in the app and website come from
 OpenStreetMap and show the required attribution.
+
+## Author
+
+Designed and built by Abdel Rahman Mohamad EL-Sayed ([AbdelRahman-Madboly](https://github.com/AbdelRahman-Madboly) on GitHub) as a VINEX product.
