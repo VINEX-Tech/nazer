@@ -10,7 +10,7 @@ else
 fi
 out="${TMPDIR:-/tmp}/nazer-host-checks"
 mkdir -p "$out"
-for check in roadlimits power_policy queue ble_auth; do
+for check in roadlimits power_policy queue ble_auth claim_response; do
     g++ -std=c++11 -Wall -Wextra -Werror -pedantic "test/host/test_${check}.cpp" -o "$out/${check}"
     "$out/${check}"
     echo "PASS ${check}"

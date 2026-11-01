@@ -3,7 +3,7 @@
 // config.example.h: template and build fallback for config.h.
 //
 // Copy this file to config.local.h (gitignored) and fill in the real
-// WiFi credentials, device key, BLE pairing code and server host.
+// WiFi credentials, device key, BLE passkey and pairing code and server host.
 // include/config.h picks config.local.h when it exists, otherwise this
 // file, so a fresh clone builds with the placeholders below. With the
 // placeholders the device refuses all BLE commands and the server
@@ -76,6 +76,12 @@
 // Settings. The placeholder below disables all BLE commands.
 // ===========================================================
 #define BLE_PAIR_CODE      "your_ble_pairing_code_here"
+
+// ---- BLE passkey (link encryption) ----
+// Six digits the phone asks for once when it bonds with the device
+// (LE Secure Connections with MITM protection). Unique per device.
+// 0 is the placeholder: change it before giving the device to anyone.
+#define BLE_PASSKEY        0
 
 // ===========================================================
 // ---- Server endpoints ----

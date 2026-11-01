@@ -53,6 +53,22 @@ bool BLETransport::connect() {
 
     BLEDevice::init(_deviceName.c_str());
 
+    // ---- Link security: LE Secure Connections, MITM protection, bonding ----
+    // The phone must pair with the static passkey BLE_PASSKEY (Android shows
+    // a passkey prompt) before it can subscribe or write: every characteristic
+    // below needs an encrypted, authenticated link. The pairing code and the
+    // claim answer therefore never cross the air in clear.
+    BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+    BLESecurity* security = new BLESecurity();
+    security->setStaticPIN(BLE_PASSKEY);                       // also sets IO capability "display only"
+    security->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
+    security->setCapability(ESP_IO_CAP_OUT);
+    security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    security->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    uint8_t onlySpecified = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;   // refuse legacy / no-MITM pairing
+    esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &onlySpecified, sizeof(onlySpecified));
+    if (BLE_PASSKEY == 0) Serial.println("[W][BLE] BLE_PASSKEY is the placeholder 000000: set a real one");
+
     // Request 247-byte MTU so chunks are not truncated on early notifications.
     // The phone will negotiate down if it can't support 247, but most Android
     // and iOS devices support 247 or higher. Must be called before createServer().
@@ -72,13 +88,17 @@ bool BLETransport::connect() {
     );
     // BLE2902 is the CCCD: required for NOTIFY to work.
     // Without it, nRF Connect shows the characteristic but can't enable notifications.
-    _telemetryChar->addDescriptor(new BLE2902());
+    _telemetryChar->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM);
+    BLE2902* cccd = new BLE2902();
+    cccd->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM | ESP_GATT_PERM_WRITE_ENC_MITM);
+    _telemetryChar->addDescriptor(cccd);
 
     // ---- Command characteristic (WRITE) ----
     _commandChar = service->createCharacteristic(
         BLE_CHAR_COMMAND,
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
     );
+    _commandChar->setAccessPermissions(ESP_GATT_PERM_WRITE_ENC_MITM);
     _cmdCallbacks.queue = xQueueCreate(6, BLE_CMD_MAX);
     _commandChar->setCallbacks(&_cmdCallbacks);
 

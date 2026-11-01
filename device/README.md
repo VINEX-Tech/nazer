@@ -25,7 +25,8 @@ Bring-up on 2026-10-16 with `test/test_bringup.cpp` (`pio run -e bringup -t uplo
 | GPS + IMU speed (1D Kalman filter) | `lib/Fusion`, `lib/GPS`, `lib/IMU` |
 | Road speed limit lookup from a LittleFS pack (`data/limits.bin`) | `lib/RoadLimits` |
 | GPRS uploads in batches with a RAM queue, parked mode, data saver | `lib/Cellular`, `lib/Vehicle/PowerPolicy.h` |
-| BLE GATT link to the app, gated by a pairing code | `lib/Transport/BLETransport.*`, `lib/Transport/BleAuth.h` |
+| BLE GATT link to the app: bonded, encrypted, gated by a pairing code | `lib/Transport/BLETransport.*`, `lib/Transport/BleAuth.h` |
+| Answer to the server's device-claim challenge | `lib/Transport/ClaimResponse.h` |
 | Vehicle modes, emergency contacts, crash detection logic | `lib/Vehicle`, `lib/Crash` |
 | JSON payloads | `lib/Storage/DataBuilder.*` |
 
@@ -50,7 +51,8 @@ the placeholder key) and refuses all BLE commands (placeholder pairing code).
 | Setting in `config.local.h` | Meaning |
 |---|---|
 | `SERVER_HOST` | Backend origin, plain HTTP (the SIM800L cannot do TLS) |
-| `DEVICE_SECRET_KEY` | This device's key; the server must list it as `DEVICE_ID:key` in `NAZER_DEVICE_KEYS`. Also derives the claim code: HMAC-SHA256(key, `nazer-claim:` + device ID), 12 hex digits |
+| `DEVICE_SECRET_KEY` | This device's key; the server must list it as `DEVICE_ID:key` in `NAZER_DEVICE_KEYS`. Also answers the server's claim challenge |
+| `BLE_PASSKEY` | 6-digit passkey for BLE bonding (LE Secure Connections); entered once in Android's pairing prompt |
 | `BLE_PAIR_CODE` | 8 to 64 characters; entered once in the app's Settings |
 | `GSM_APN` | Carrier APN |
 
@@ -70,6 +72,7 @@ bash test/host/run_checks.sh
 | `test_power_policy.cpp` | Upload intervals, parked dwell, millis rollover, battery alerts |
 | `test_queue.cpp` | Upload queue: capacity, back-pressure, failed batches, wrap-around |
 | `test_ble_auth.cpp` | Pairing gate: placeholder codes fail closed, exact match, lockout, rollover, command gate |
+| `test_claim_response.cpp` | Claim answer: SHA-256 and RFC 4231 HMAC vectors, a vector shared with the server tests, bad nonces |
 
 `test/host/make_test_pack.py` rebuilds the synthetic fixtures with the same writer the server uses
 (`../platform/apps/api/scripts/build_speed_limits.py`).
@@ -86,11 +89,19 @@ The other files in `test/` are on-device sketches for single modules. Select one
 | Notify | `beb5483e-36e1-4688-b7f5-ea07361b26a8`: telemetry, events, config, auth replies, framed as `N/M\|json` chunks |
 | Write | `1c95d5e3-d8f7-413a-bf3d-7a2e5d7be87e`: JSON commands |
 
+All characteristics need an encrypted link: the phone first bonds with LE Secure Connections and
+the passkey `BLE_PASSKEY` (code in `BLETransport.cpp`; not yet tested on the board, see
+`../SECURITY.md`).
+
 The first command must be `{"cmd":"auth","code":"<BLE_PAIR_CODE>"}`. The device answers
-`{"auth":"ok"}` and sends its config (including `device_id` and the `claim_code` the app needs to
-register the device on the server), or `{"auth":"failed","reason":"wrong_code|locked|not_configured"}`.
-Other commands (`set_limit`, `set_mode`, `set_contacts`, `set_saver`, `cancel_crash`, `get_config`,
-`calibrate_imu`) are refused with `{"auth":"required"}` until then.
+`{"auth":"ok"}` and sends its config (including `device_id`), or
+`{"auth":"failed","reason":"wrong_code|locked|not_configured"}`. Other commands (`set_limit`,
+`set_mode`, `set_contacts`, `set_saver`, `cancel_crash`, `get_config`, `calibrate_imu`, `claim`) are
+refused with `{"auth":"required"}` until then.
+
+To link the device to an account, the app passes a server nonce with `{"cmd":"claim","nonce":"<hex>"}`
+and the device replies `{"claim":{"device_id":...,"nonce":...,"response":"<HMAC-SHA256(key, nonce ||
+device_id) in hex>"}}` (`lib/Transport/ClaimResponse.h`).
 
 ## Bench test server
 
@@ -111,4 +122,4 @@ uvicorn server:app --host 0.0.0.0 --port 8080
 | Kalman noise values | Not tuned on a drive |
 | Battery percentage | Not measured (divider not fitted) |
 | Device traffic | Plain HTTP; see `../SECURITY.md` |
-| Claim code | Computed with mbedtls on the device; the server side is tested, the firmware side only builds (no host test) |
+| BLE bonding | LE Secure Connections code builds but has not been run on the board yet |

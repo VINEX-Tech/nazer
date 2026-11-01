@@ -3,7 +3,6 @@
 #include <Wire.h>
 #include <ArduinoJson.h>
 #include <sys/time.h>
-#include <mbedtls/md.h>
 
 #include "config.h"
 #include "Logger.h"
@@ -17,6 +16,7 @@
 #include "RoadLimits.h"
 #include "PowerPolicy.h"
 #include "BleAuth.h"
+#include "ClaimResponse.h"
 
 static SensorFusion     g_fusion;
 static TransportManager g_transport;   // BLE GATT server + offline violation queue
@@ -76,21 +76,6 @@ static void mapsLink(char* out, size_t len) {
     else snprintf(out, len, "https://maps.google.com/?q=%.6f,%.6f (%lu min ago)", g_lastLat, g_lastLon, (unsigned long)ageMin);
 }
 
-// Claim code for registering this device on the server (server: core/auth.py
-// claim_code). HMAC-SHA256(DEVICE_SECRET_KEY, "nazer-claim:" + device ID), first
-// 12 hex digits, upper case. Only sent to a phone that has paired over BLE.
-static void claimCode(char* out, size_t len) {
-    String msg = String("nazer-claim:") + deviceId();
-    uint8_t mac[32];
-    const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (len < 13 || mbedtls_md_hmac(info, (const uint8_t*)DEVICE_SECRET_KEY, strlen(DEVICE_SECRET_KEY),
-                                    (const uint8_t*)msg.c_str(), msg.length(), mac) != 0) {
-        if (len) out[0] = '\0';
-        return;
-    }
-    for (int i = 0; i < 6; i++) snprintf(out + 2 * i, 3, "%02X", mac[i]);
-}
-
 static void notifyConfig() {
     JsonDocument doc;
     JsonObject c = doc["config"].to<JsonObject>();
@@ -101,11 +86,8 @@ static void notifyConfig() {
     c["imu_calibrated"] = g_fusion.imu().isCalibrated();
     JsonArray arr = c["contacts"].to<JsonArray>();
     for (uint8_t i = 0; i < Vehicle.contactCount(); i++) arr.add(Vehicle.contact(i));
-    char claim[13];
-    claimCode(claim, sizeof(claim));
     c["device_id"] = deviceId();
-    c["claim_code"] = claim;
-    char buf[448];
+    char buf[384];
     serializeJson(doc, buf, sizeof(buf));
     g_transport.ble().notifyJson(buf);
 }
@@ -416,6 +398,23 @@ static void handleBleCommands() {
             changed = true;
         } else if (strcmp(cmd, "cancel_crash") == 0) {
             cancelCrash("app");
+        } else if (strcmp(cmd, "claim") == 0) {
+            // Answer the server's one-time claim challenge (ClaimResponse.h).
+            // Only reachable after pairing, over the bonded, encrypted link.
+            const char* nonce = doc["nonce"] | "";
+            char answer[65];
+            JsonDocument reply;
+            JsonObject r = reply["claim"].to<JsonObject>();
+            r["device_id"] = deviceId();
+            r["nonce"] = nonce;
+            if (claim::response(DEVICE_SECRET_KEY, nonce, deviceId().c_str(), answer, sizeof(answer))) {
+                r["response"] = answer;
+            } else {
+                r["error"] = "bad_nonce";
+            }
+            char buf[256];
+            serializeJson(reply, buf, sizeof(buf));
+            g_transport.ble().notifyJson(buf);
         } else if (strcmp(cmd, "get_config") == 0) {
             notifyConfig();
         } else if (strcmp(cmd, "calibrate_imu") == 0) {

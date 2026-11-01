@@ -46,6 +46,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>          // Client Characteristic Configuration Descriptor (CCCD)
+#include <BLESecurity.h>
 #include <ArduinoJson.h>
 #include "ITransport.h"
 #include "config.h"
