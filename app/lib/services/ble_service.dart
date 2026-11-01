@@ -60,6 +60,11 @@ class BleService {
   Stream<DeviceConfig> get configStream => _configController.stream;
 
   final _authController = StreamController<BleAuthReply>.broadcast();
+  final _claimController = StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Device answers to {"cmd":"claim","nonce":...}: device_id, nonce,
+  /// response (or error).
+  Stream<Map<String, dynamic>> get claimStream => _claimController.stream;
 
   /// Pairing replies from the device: required, ok or failed (with reason).
   Stream<BleAuthReply> get authStream => _authController.stream;
@@ -250,6 +255,7 @@ class BleService {
     _eventController.close();
     _configController.close();
     _authController.close();
+    _claimController.close();
     _telemetryController.close();
     _violationController.close();
     _connectionStateController.close();
@@ -321,6 +327,17 @@ class BleService {
     }
 
     await _notifySubscription?.cancel();
+    if (Platform.isAndroid) {
+      // The device only serves bonded, encrypted links (LE Secure
+      // Connections with a passkey). Android shows the passkey prompt here.
+      try {
+        await device.createBond();
+      } catch (e) {
+        debugPrint('[BLE] Bonding failed: $e');
+        _onDisconnected();
+        return;
+      }
+    }
     try {
       await telemetryChar.setNotifyValue(true);
     } catch (e) {
@@ -405,6 +422,10 @@ class BleService {
   void _dispatchJson(String json) {
     try {
       final map = jsonDecode(json) as Map<String, dynamic>;
+      if (map['claim'] is Map) {
+        _claimController.add(Map<String, dynamic>.from(map['claim'] as Map));
+        return;
+      }
       if (map['auth'] is String) {
         _authController.add(BleAuthReply(
             map['auth'] as String, map['reason'] as String?));

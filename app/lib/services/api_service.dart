@@ -66,14 +66,23 @@ class ApiService {
         Map<String, dynamic>.from(response.data as Map));
   }
 
-  /// POST /v1/auth/register. Links [deviceId], proven by the [claimCode]
-  /// the device shows over paired BLE, and returns a signed-in session.
+  /// POST /v1/auth/claim-challenge. Returns a one-time nonce (valid about
+  /// two minutes) that the paired device must answer.
+  Future<String> claimChallenge(String deviceId) async {
+    final response = await _dio.post('/v1/auth/claim-challenge',
+        data: {'device_id': deviceId.trim()});
+    return (response.data as Map)['nonce'] as String;
+  }
+
+  /// POST /v1/auth/register. Links [deviceId], proven by the device's
+  /// [claimResponse] to [nonce], and returns a signed-in session.
   Future<AuthSession> register(
       {required String fullName,
       required String nationalId,
       required String carPlate,
       required String deviceId,
-      required String claimCode,
+      required String nonce,
+      required String claimResponse,
       required String password}) async {
     final response = await _dio.post('/v1/auth/register', data: {
       'full_name': fullName.trim(),
@@ -81,7 +90,8 @@ class ApiService {
       'car_plate': carPlate.trim(),
       'device_id': deviceId.trim(),
       'password': password,
-      'claim_code': claimCode,
+      'nonce': nonce,
+      'claim_response': claimResponse,
     });
     final json = Map<String, dynamic>.from(response.data as Map);
     return AuthSession.fromJson({...json, 'full_name': fullName.trim()});

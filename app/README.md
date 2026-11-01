@@ -7,7 +7,7 @@ Flutter app (Android) for the Nazer prototype tracker. Part of the Nazer monorep
 
 | Feature | Notes |
 |---|---|
-| Live speed over BLE | Connects to `NAZER-XXXX`, sends the pairing code, shows speed against the road or user limit |
+| Live speed over BLE | Connects to `NAZER-XXXX`, bonds (Android passkey prompt), sends the pairing code, shows speed against the road or user limit |
 | Internet tracking | When out of BLE range, polls the server for live position, the last hour of track and device events. Needs a signed-in account linked to the device |
 | Map | flutter_map with OpenStreetMap tiles (attribution shown), trail, road-limit overlay |
 | Vehicle settings | Mode, user speed limit, emergency contacts, data saver, IMU calibration (over paired BLE) |
@@ -21,7 +21,7 @@ cd app
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs   # generates *.g.dart (Hive adapters)
 flutter analyze
-flutter test        # 65 tests
+flutter test        # 66 tests
 flutter run -d <android-device>   # BLE needs a real phone
 ```
 
@@ -36,11 +36,15 @@ after changing a Hive model. CI does the same.
 In Settings:
 
 1. Server URL: the backend origin over HTTPS (Android blocks plain HTTP by default).
-2. Bluetooth pairing: enter the device's `BLE_PAIR_CODE`. Until it matches, the device ignores all
-   commands and sends no data.
+2. Bluetooth: on first connect Android asks for the device's 6-digit `BLE_PASSKEY` to bond. Then
+   enter the device's `BLE_PAIR_CODE` in Settings. Until it matches, the device ignores all commands
+   and sends no data.
 3. Account: sign in, or create an account. Creating one needs the device connected and paired: the
-   device sends its claim code only to a paired phone, and the server only links a device whose
-   claim code matches.
+   app gets a one-time nonce from the server, the device answers it over the encrypted link, and the
+   server links the device only if the answer is right.
+
+Bonding and the claim relay are covered by tests with a fake BLE device only; they have not been run
+with the real board yet.
 
 ## Signing
 

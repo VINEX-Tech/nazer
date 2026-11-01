@@ -219,30 +219,49 @@ class DeviceProvider extends ChangeNotifier {
   }
 
   /// Creates a driver account linked to the connected, paired device and
-  /// signs in. The device's claim code proves the phone holds the device.
+  /// signs in. Proof of possession: the server issues a one-time nonce, the
+  /// device answers it over the encrypted BLE link, the server checks it.
   Future<void> register(
       {required String fullName,
       required String nationalId,
       required String carPlate,
       required String password}) async {
-    final code = config?.claimCode, device = config?.deviceId ?? deviceId;
-    if (!isConnected || !paired || code == null || code.isEmpty) {
+    final device = config?.deviceId ?? deviceId;
+    if (!isConnected || !paired || device.isEmpty) {
       accountError =
           'Connect and pair the device over Bluetooth before creating an account.';
       _notify();
       throw StateError(accountError!);
     }
     try {
+      final nonce = await _api.claimChallenge(device);
+      final answer = _ble.claimStream
+          .firstWhere((c) => c['nonce'] == nonce)
+          .timeout(const Duration(seconds: 10));
+      await _ble.sendCommand({'cmd': 'claim', 'nonce': nonce});
+      final reply = await answer;
+      final response = reply['response'];
+      if (response is! String) {
+        accountError = 'The device could not answer the claim. Retry.';
+        _notify();
+        throw StateError(accountError!);
+      }
       await _saveSession(await _api.register(
           fullName: fullName,
           nationalId: nationalId,
           carPlate: carPlate,
           deviceId: device,
-          claimCode: code,
+          nonce: nonce,
+          claimResponse: response,
           password: password));
+    } on TimeoutException {
+      accountError = 'The device did not answer. Keep it connected and retry.';
+      _notify();
+      rethrow;
     } on DioException catch (e) {
       accountError = switch (e.response?.statusCode) {
-        403 => 'The server did not accept this device. Check its key on the server.',
+        403 =>
+          'The server did not accept the device\'s answer. Retry, or check its key on the server.',
         409 =>
           'Could not register: the device is already linked or these details are in use.',
         429 => 'Too many attempts. Wait a few minutes and retry.',

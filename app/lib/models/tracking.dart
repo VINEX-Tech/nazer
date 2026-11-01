@@ -65,11 +65,10 @@ class DeviceConfig {
   final bool? saver, imuCalibrated;
   final List<String>? contacts;
 
-  /// Sent only after BLE pairing; needed to link the device to an account.
-  final String? claimCode, deviceId;
+  /// Device ID, sent only after BLE pairing.
+  final String? deviceId;
   const DeviceConfig(
-      {this.claimCode,
-      this.deviceId,
+      {this.deviceId,
       this.speedLimit,
       this.vehicleMode,
       this.contacts,
@@ -85,7 +84,6 @@ class DeviceConfig {
         'imu_calibrated': imuCalibrated,
       };
   factory DeviceConfig.fromJson(Map<String, dynamic> json) => DeviceConfig(
-      claimCode: json['claim_code'] as String?,
       deviceId: json['device_id'] as String?,
       speedLimit: (json['speed_limit_kmh'] as num?)?.toInt(),
       vehicleMode: json['vehicle_mode'] as String?,

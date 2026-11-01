@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -16,7 +17,9 @@ class _Recorder implements HttpClientAdapter {
       Future<void>? cancel) async {
     requests.add(options);
     final body = options.path.startsWith('/v1/auth/')
-        ? '{"access_token":"tok-1","driver_id":7,"device_id":"NAZER_1","full_name":"Driver"}'
+        ? (options.path.endsWith('claim-challenge')
+            ? '{"nonce":"abc","expires_in":120}'
+            : '{"access_token":"tok-1","driver_id":7,"device_id":"NAZER_1","full_name":"Driver"}')
         : options.path.endsWith('/live')
             ? '{"device_id":"NAZER_1","speed_kmh":10}'
             : '[]';
@@ -44,16 +47,44 @@ class _RejectingApi extends FakeApi {
 
 class _RegisterApi extends FakeApi {
   final calls = <Map<String, String>>[];
+  int challenges = 0;
+  @override
+  Future<String> claimChallenge(String deviceId) async {
+    challenges++;
+    return 'nonce-$challenges';
+  }
+
   @override
   Future<AuthSession> register(
       {required String fullName,
       required String nationalId,
       required String carPlate,
       required String deviceId,
-      required String claimCode,
+      required String nonce,
+      required String claimResponse,
       required String password}) async {
-    calls.add({'device': deviceId, 'code': claimCode});
+    calls.add({'device': deviceId, 'nonce': nonce, 'response': claimResponse});
     return AuthSession(token: 'tok-2', driverId: 3, deviceId: deviceId);
+  }
+}
+
+/// Answers claim commands the way the firmware does (or stays silent).
+class _ClaimingBle extends FakeBle {
+  bool answer = true;
+  @override
+  Future<void> sendCommand(Map<String, dynamic> cmd) async {
+    await super.sendCommand(cmd);
+    if (cmd['cmd'] == 'claim' && answer) {
+      final reply = {
+        'claim': {
+          'device_id': 'NAZER_0B49EFD0',
+          'nonce': cmd['nonce'],
+          'response': 'hmac-of-${cmd['nonce']}'
+        }
+      };
+      scheduleMicrotask(
+          () => acceptNotification(utf8.encode(jsonEncode(reply))));
+    }
   }
 }
 
@@ -84,12 +115,16 @@ void main() {
         nationalId: '12345678901234',
         carPlate: 'ABC 123',
         deviceId: 'NAZER_1',
-        claimCode: 'ABCDEF123456',
+        nonce: 'n1',
+        claimResponse: 'r1',
         password: 'secret-pass');
     expect(adapter.requests.last.path, '/v1/auth/register');
-    expect((adapter.requests.last.data as Map)['claim_code'], 'ABCDEF123456');
+    expect((adapter.requests.last.data as Map)['nonce'], 'n1');
+    expect((adapter.requests.last.data as Map)['claim_response'], 'r1');
     expect((adapter.requests.last.data as Map)['full_name'], 'Driver');
     expect(created.token, 'tok-1');
+    expect(await api.claimChallenge(' NAZER_1 '), 'abc');
+    expect(adapter.requests.last.data, {'device_id': 'NAZER_1'});
     api.dispose();
   });
 
@@ -126,8 +161,8 @@ void main() {
     expect(api.liveCalls, 1);
     await provider.signOut();
     expect(provider.signedIn, isFalse);
-    expect((await SharedPreferences.getInstance()).getString('api_token'),
-        isNull);
+    expect(
+        (await SharedPreferences.getInstance()).getString('api_token'), isNull);
     provider.dispose();
   });
 
@@ -176,9 +211,10 @@ void main() {
     provider.dispose();
   });
 
-  testWidgets('account creation needs a paired device and sends its claim code',
+  testWidgets(
+      'account creation relays a one-time server nonce through the paired device',
       (tester) async {
-    final ble = FakeBle(), api = _RegisterApi()..signedIn = false;
+    final ble = _ClaimingBle(), api = _RegisterApi()..signedIn = false;
     final provider = DeviceProvider(ble: ble, api: api);
     await provider.ready;
     Future<void> create() => provider.register(
@@ -188,16 +224,45 @@ void main() {
         password: 'secret-pass');
     await expectLater(create(), throwsStateError);
     expect(provider.accountError, contains('pair'));
-    expect(api.calls, isEmpty);
+    expect(api.challenges, 0);
     ble.connections.add(BleConnectionEvent.connected);
     await tester.pump();
     ble.acceptNotification(utf8.encode('{"auth":"ok"}'));
-    ble.acceptNotification(utf8.encode(
-        '{"config":{"device_id":"NAZER_0B49EFD0","claim_code":"ABCDEF123456"}}'));
+    ble.acceptNotification(
+        utf8.encode('{"config":{"device_id":"NAZER_0B49EFD0"}}'));
     await tester.pump();
-    await create();
-    expect(api.calls.single, {'device': 'NAZER_0B49EFD0', 'code': 'ABCDEF123456'});
+    await tester.runAsync(create);
+    expect(ble.commands.last, {'cmd': 'claim', 'nonce': 'nonce-1'});
+    expect(api.calls.single, {
+      'device': 'NAZER_0B49EFD0',
+      'nonce': 'nonce-1',
+      'response': 'hmac-of-nonce-1'
+    });
     expect(provider.signedIn, isTrue);
+    provider.dispose();
+  });
+
+  testWidgets('a silent device times out instead of registering',
+      (tester) async {
+    final ble = _ClaimingBle()..answer = false,
+        api = _RegisterApi()..signedIn = false;
+    final provider = DeviceProvider(ble: ble, api: api);
+    await provider.ready;
+    ble.connections.add(BleConnectionEvent.connected);
+    await tester.pump();
+    ble.acceptNotification(utf8.encode('{"auth":"ok"}'));
+    ble.acceptNotification(
+        utf8.encode('{"config":{"device_id":"NAZER_0B49EFD0"}}'));
+    await tester.pump();
+    Object? error;
+    provider
+        .register(
+            fullName: 'D', nationalId: '1', carPlate: 'X', password: 'pw-12345')
+        .catchError((Object e) => error = e);
+    await tester.pump(const Duration(seconds: 11));
+    expect(error, isA<TimeoutException>());
+    expect(api.calls, isEmpty);
+    expect(provider.accountError, contains('did not answer'));
     provider.dispose();
   });
 }
