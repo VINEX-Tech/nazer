@@ -76,8 +76,19 @@ class RegisterRequest(BaseModel):
     phone:       Optional[str] = None
     device_id:   str
     password:    str = Field(min_length=8, max_length=72)   # bcrypt reads at most 72 bytes
-    # Proof that the caller holds the device: shown by the device to a paired phone.
-    claim_code:  str = Field(min_length=1, max_length=64)
+    # Proof that the caller holds the device: a nonce from /v1/auth/claim-challenge
+    # and the device's answer to it, relayed by the paired phone.
+    nonce:          str = Field(min_length=1, max_length=64)
+    claim_response: str = Field(min_length=1, max_length=128)
+
+
+class ClaimChallengeRequest(BaseModel):
+    device_id: str = Field(min_length=1, max_length=64)
+
+
+class ClaimChallengeResponse(BaseModel):
+    nonce:      str
+    expires_in: int
 
 
 class RegisterResponse(BaseModel):

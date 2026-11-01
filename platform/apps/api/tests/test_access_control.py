@@ -7,7 +7,7 @@ from jose import jwt
 from app.core.config import parse_device_keys
 from app.core.database import SessionLocal
 from app import models
-from conftest import ADMIN, device_claim_code, device_headers, unclaimed_device
+from conftest import ADMIN, claim_fields, device_headers, unclaimed_device
 
 DEV_A, DEV_B = "auth_dev_a", "auth_dev_b"
 
@@ -28,7 +28,7 @@ def _driver(client, device_id):
             db.commit()
     assert _post_point(client, device_id).status_code == 200
     payload = {"full_name": "Driver", "national_id": uuid.uuid4().hex[:14], "car_plate": "X 1",
-               "device_id": device_id, "password": "pass-word-1", "claim_code": device_claim_code(device_id)}
+               "device_id": device_id, "password": "pass-word-1", **claim_fields(client, device_id)}
     resp = client.post("/v1/auth/register", json=payload)
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]
@@ -102,7 +102,7 @@ def test_login_returns_working_token_and_hides_unknown_ids(client):
 def test_register_rejects_short_password(client):
     assert _post_point(client, DEV_A).status_code == 200
     payload = {"full_name": "D", "national_id": uuid.uuid4().hex[:14], "car_plate": "X",
-               "device_id": DEV_A, "password": "short", "claim_code": device_claim_code(DEV_A)}
+               "device_id": DEV_A, "password": "short", **claim_fields(client, DEV_A)}
     assert client.post("/v1/auth/register", json=payload).status_code == 422
 
 
@@ -178,26 +178,72 @@ def test_parse_device_keys_ignores_shared_or_malformed_entries():
     assert keys == {"NAZER_1": "abc", "NAZER_3": "k:with:colons"}
 
 
-# ─── Registration: proof of possession, atomic claim, no ID probing ─────────
+# ─── Registration: challenge-response claim, atomic claim, no ID probing ────
 
-def _register(client, device_id, national_id=None, code=None, password="pass-word-1"):
+def _register(client, device_id, national_id=None, claim=None, password="pass-word-1"):
     return client.post("/v1/auth/register", json={
         "full_name": "Driver", "car_plate": "X 1", "device_id": device_id, "password": password,
         "national_id": national_id or uuid.uuid4().hex[:14],
-        "claim_code": device_claim_code(device_id) if code is None else code})
+        **(claim_fields(client, device_id) if claim is None else claim)})
 
 
-def test_register_requires_the_device_claim_code(client):
+def _set_nonce_expiry(nonce, delta):
+    with SessionLocal() as db:
+        db.get(models.ClaimChallenge, nonce).expires_at = datetime.utcnow() + delta
+        db.commit()
+
+
+def test_register_requires_a_valid_claim_answer(client):
     device = unclaimed_device()
-    assert _register(client, device, code="").status_code == 422
-    assert _register(client, device, code="000000000000").status_code == 403
-    # Another device's valid code does not work either.
-    assert _register(client, device, code=device_claim_code(DEV_B)).status_code == 403
+    assert client.post("/v1/auth/register", json={"full_name": "D", "car_plate": "X", "device_id": device,
+                       "password": "pass-word-1", "national_id": "1"}).status_code == 422
+    good = claim_fields(client, device)
+    assert _register(client, device, claim={**good, "claim_response": "0" * 64}).status_code == 403
+    # Answered with another device's key.
+    assert _register(client, device, claim=claim_fields(client, device, key=f"key-{DEV_B}")).status_code == 403
     # A device the server has no key for cannot be claimed at all.
-    assert _register(client, "NAZER_UNKNOWN", code="000000000000").status_code == 403
-    ok = _register(client, device, code=device_claim_code(device).lower())   # case-insensitive
+    assert _register(client, "NAZER_UNKNOWN", claim=claim_fields(client, "NAZER_UNKNOWN", key="guess")).status_code == 403
+    fresh = claim_fields(client, device)
+    ok = _register(client, device, claim={**fresh, "claim_response": fresh["claim_response"].upper()})
     assert ok.status_code == 200, ok.text
     assert ok.json()["device_id"] == device
+
+
+def test_claim_nonce_is_single_use(client):
+    device = unclaimed_device()
+    claim = claim_fields(client, device)
+    # A wrong answer burns the nonce: the right answer with it then fails.
+    assert _register(client, device, claim={**claim, "claim_response": "f" * 64}).status_code == 403
+    assert _register(client, device, claim=claim).status_code == 403
+    # A successful nonce cannot be replayed either (403, before the 409 for a linked device).
+    claim = claim_fields(client, device)
+    assert _register(client, device, claim=claim).status_code == 200
+    assert _register(client, device, claim=claim).status_code == 403
+
+
+def test_claim_nonce_expires(client):
+    device = unclaimed_device()
+    claim = claim_fields(client, device)
+    _set_nonce_expiry(claim["nonce"], timedelta(seconds=-1))
+    assert _register(client, device, claim=claim).status_code == 403
+    claim = claim_fields(client, device)
+    _set_nonce_expiry(claim["nonce"], timedelta(seconds=5))   # still inside its lifetime
+    assert _register(client, device, claim=claim).status_code == 200
+
+
+def test_claim_nonce_is_bound_to_its_device(client):
+    issued_for, other = unclaimed_device(), unclaimed_device()
+    nonce = client.post("/v1/auth/claim-challenge", json={"device_id": issued_for}).json()["nonce"]
+    from app.core.auth import claim_response
+    answer = claim_response(other, f"key-{other}", nonce)
+    assert _register(client, other, claim={"nonce": nonce, "claim_response": answer}).status_code == 403
+
+
+def test_challenge_is_issued_for_any_device_id(client):
+    for device_id in [DEV_A, "NAZER_DOES_NOT_EXIST"]:
+        resp = client.post("/v1/auth/claim-challenge", json={"device_id": device_id})
+        assert resp.status_code == 200
+        assert len(resp.json()["nonce"]) == 32 and resp.json()["expires_in"] > 0
 
 
 def test_device_cannot_be_claimed_twice(client):
@@ -210,8 +256,9 @@ def test_device_cannot_be_claimed_twice(client):
 def test_concurrent_claims_have_one_winner(client):
     from concurrent.futures import ThreadPoolExecutor
     device = unclaimed_device()
+    claims = [claim_fields(client, device) for _ in range(4)]
     with ThreadPoolExecutor(max_workers=4) as pool:
-        codes = [r.status_code for r in pool.map(lambda _: _register(client, device), range(4))]
+        codes = [r.status_code for r in pool.map(lambda c: _register(client, device, claim=c), claims)]
     assert sorted(codes) == [200, 409, 409, 409]
     with SessionLocal() as db:
         assert db.query(models.Driver).join(models.Device, models.Device.driver_id == models.Driver.id) \
@@ -221,10 +268,11 @@ def test_concurrent_claims_have_one_winner(client):
 def test_register_does_not_reveal_whether_a_national_id_exists(client):
     taken = uuid.uuid4().hex[:14]
     assert _register(client, unclaimed_device(), national_id=taken).status_code == 200
-    # Without the claim code the answer is 403 whether or not the ID exists.
+    # Without a valid claim the answer is 403 whether or not the ID exists.
     for national_id in [taken, uuid.uuid4().hex[:14]]:
-        assert _register(client, unclaimed_device(), national_id=national_id, code="bad").status_code == 403
-    # With a valid code, a taken ID and a linked device give the same 409 body.
+        bad = {"nonce": "0" * 32, "claim_response": "0" * 64}
+        assert _register(client, unclaimed_device(), national_id=national_id, claim=bad).status_code == 403
+    # With a valid claim, a taken ID and a linked device give the same 409 body.
     from app.routers.auth import register_limiter
     register_limiter.reset()   # this test makes more attempts than one window allows
     taken_id = _register(client, unclaimed_device(), national_id=taken)
@@ -235,16 +283,20 @@ def test_register_does_not_reveal_whether_a_national_id_exists(client):
     assert taken_id.json() == linked.json()
 
 
-def test_register_and_login_are_rate_limited(client):
+def test_register_login_and_challenge_are_rate_limited(client):
     from app.core import config
+    bad = {"nonce": "0" * 32, "claim_response": "0" * 64}
     for _ in range(config.REGISTER_LIMIT):
-        assert _register(client, "NAZER_UNKNOWN", code="bad").status_code == 403
-    blocked = _register(client, unclaimed_device())
+        assert _register(client, "NAZER_UNKNOWN", claim=bad).status_code == 403
+    blocked = _register(client, "NAZER_UNKNOWN", claim=bad)
     assert blocked.status_code == 429
     assert int(blocked.headers["Retry-After"]) > 0
     for _ in range(config.LOGIN_LIMIT):
         assert client.post("/v1/auth/login", json={"national_id": "x", "password": "y"}).status_code == 401
     assert client.post("/v1/auth/login", json={"national_id": "x", "password": "y"}).status_code == 429
+    for _ in range(config.CHALLENGE_LIMIT):
+        assert client.post("/v1/auth/claim-challenge", json={"device_id": "x"}).status_code == 200
+    assert client.post("/v1/auth/claim-challenge", json={"device_id": "x"}).status_code == 429
 
 
 def test_rate_limiter_window_slides():
@@ -264,11 +316,8 @@ def test_rate_limiter_window_slides():
     limiter.check("ip")             # first hit has left the window
 
 
-def test_claim_code_format_matches_firmware():
-    # device/src/main.cpp claimCode(): HMAC-SHA256(key, "nazer-claim:" + id), 12 upper-case hex digits.
-    import hashlib
-    import hmac as hmac_mod
-    from app.core.auth import claim_code
-    expected = hmac_mod.new(b"k", b"nazer-claim:NAZER_0B49EFD0", hashlib.sha256).hexdigest()[:12].upper()
-    assert claim_code("NAZER_0B49EFD0", "k") == expected
-    assert len(expected) == 12
+def test_claim_answer_matches_firmware_vector():
+    # Same inputs and output as device/test/host/test_claim_response.cpp.
+    from app.core.auth import claim_response
+    assert claim_response("NAZER_0B49EFD0", "fixture-input", "0123456789abcdef0123456789abcdef") == \
+        "cf39428055772745f8140470d732a97114a42f7b6282a1a2099ad948473ae8ae"

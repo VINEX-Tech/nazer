@@ -46,6 +46,11 @@ REGISTER_LIMIT = int(os.environ.get("NAZER_REGISTER_LIMIT", "5"))
 REGISTER_WINDOW_SEC = int(os.environ.get("NAZER_REGISTER_WINDOW_SEC", "600"))
 LOGIN_LIMIT = int(os.environ.get("NAZER_LOGIN_LIMIT", "10"))
 LOGIN_WINDOW_SEC = int(os.environ.get("NAZER_LOGIN_WINDOW_SEC", "300"))
+CHALLENGE_LIMIT = int(os.environ.get("NAZER_CHALLENGE_LIMIT", "10"))
+CHALLENGE_WINDOW_SEC = int(os.environ.get("NAZER_CHALLENGE_WINDOW_SEC", "600"))
+
+# Lifetime of a device-claim nonce, in seconds. Each nonce works once.
+CLAIM_TTL_SEC = int(os.environ.get("NAZER_CLAIM_TTL_SEC", "120"))
 
 # CORS: allow app and website to call backend. Comma-separated list in the
 # CORS_ORIGINS env var; falls back to local Vite dev origins if unset.

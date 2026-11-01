@@ -155,3 +155,13 @@ class Event(Base):
     tilt_deg = Column(Float, nullable=True)
 
     __table_args__ = (Index("idx_events_device_time", "device_id", "timestamp"),)
+
+
+class ClaimChallenge(Base):
+    """One-time nonce for linking a device to an account (routers/auth.py)."""
+    __tablename__ = "claim_challenges"
+
+    nonce      = Column(Text, primary_key=True)
+    device_id  = Column(Text, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used       = Column(Boolean, nullable=False, default=False)

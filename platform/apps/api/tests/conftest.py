@@ -34,9 +34,11 @@ def device_headers(device_id):
     return {"X-Device-Key": f"key-{device_id}"}
 
 
-def device_claim_code(device_id):
-    from app.core.auth import claim_code
-    return claim_code(device_id, f"key-{device_id}")
+def claim_fields(client, device_id, key=None):
+    """Get a claim nonce and answer it the way the paired device would."""
+    from app.core.auth import claim_response
+    nonce = client.post("/v1/auth/claim-challenge", json={"device_id": device_id}).json()["nonce"]
+    return {"nonce": nonce, "claim_response": claim_response(device_id, key or f"key-{device_id}", nonce)}
 
 
 _pool = iter(d for d in TEST_DEVICE_IDS if d.startswith("pool_"))
@@ -53,9 +55,10 @@ def admin_get(client, url, **kwargs):
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limits():
-    from app.routers.auth import login_limiter, register_limiter
+    from app.routers.auth import challenge_limiter, login_limiter, register_limiter
     register_limiter.reset()
     login_limiter.reset()
+    challenge_limiter.reset()
     yield
 
 

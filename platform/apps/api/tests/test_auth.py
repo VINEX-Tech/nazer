@@ -1,9 +1,9 @@
 import uuid
 
-from conftest import device_claim_code, unclaimed_device
+from conftest import claim_fields, unclaimed_device
 
 
-def _register_payload(**overrides):
+def _register_payload(client, **overrides):
     device_id = unclaimed_device()
     payload = {
         "full_name": "Test Driver",
@@ -11,7 +11,7 @@ def _register_payload(**overrides):
         "car_plate": "ABC 123",
         "device_id": device_id,
         "password": "correct-horse",
-        "claim_code": device_claim_code(device_id),
+        **claim_fields(client, device_id),
     }
     payload.update(overrides)
     return payload
@@ -39,7 +39,7 @@ def _driver_by_national_id(national_id):
 
 
 def test_register_hashes_password_not_plaintext(client):
-    payload = _register_payload()
+    payload = _register_payload(client)
     _seed_device(payload["device_id"])
 
     resp = client.post("/v1/auth/register", json=payload)
@@ -52,7 +52,7 @@ def test_register_hashes_password_not_plaintext(client):
 
 
 def test_login_succeeds_with_correct_password(client):
-    payload = _register_payload()
+    payload = _register_payload(client)
     _seed_device(payload["device_id"])
     client.post("/v1/auth/register", json=payload)
 
@@ -65,7 +65,7 @@ def test_login_succeeds_with_correct_password(client):
 
 
 def test_login_rejects_wrong_password(client):
-    payload = _register_payload()
+    payload = _register_payload(client)
     _seed_device(payload["device_id"])
     client.post("/v1/auth/register", json=payload)
 
@@ -77,7 +77,7 @@ def test_login_rejects_wrong_password(client):
 
 
 def test_passwordless_register_and_login_are_rejected(client):
-    payload = _register_payload(password=None)
+    payload = _register_payload(client, password=None)
     _seed_device(payload["device_id"])
     assert client.post("/v1/auth/register", json=payload).status_code == 422
 

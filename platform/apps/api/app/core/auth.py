@@ -120,24 +120,19 @@ def device_key(x_device_key: str | None = Header(None)) -> str:
     return x_device_key
 
 
-CLAIM_CODE_LEN = 12
+def claim_response(device_id: str, key: str, nonce: str) -> str:
+    """Expected answer to a claim challenge: HMAC-SHA256(key, nonce || device_id), hex.
 
-
-def claim_code(device_id: str, key: str) -> str:
-    """Code that proves the caller holds the device (or its key).
-
-    HMAC-SHA256(device key, "nazer-claim:" + device_id), first 12 hex digits,
-    upper case. The firmware computes the same value and shows it to the app
-    only after BLE pairing, so knowing a device ID is not enough to claim it.
+    The firmware computes the same value (device/lib/Transport/ClaimResponse.h)
+    when a paired phone passes it the nonce over the encrypted BLE link.
     """
-    digest = hmac.new(key.encode(), f"nazer-claim:{device_id}".encode(), hashlib.sha256).hexdigest()
-    return digest[:CLAIM_CODE_LEN].upper()
+    return hmac.new(key.encode(), (nonce + device_id).encode(), hashlib.sha256).hexdigest()
 
 
-def verify_claim(device_id: str, code: str) -> bool:
+def verify_claim_response(device_id: str, nonce: str, response: str) -> bool:
     key = config.DEVICE_KEYS.get(device_id)
-    expected = claim_code(device_id, key) if key else "0" * CLAIM_CODE_LEN
-    ok = hmac.compare_digest(expected.encode(), (code or "").strip().upper().encode())
+    expected = claim_response(device_id, key, nonce) if key else "0" * 64
+    ok = hmac.compare_digest(expected.encode(), (response or "").strip().lower().encode())
     return ok and key is not None
 
 

@@ -3,20 +3,24 @@
 # Both return a bearer token for /v1/app/*. Passwords are required and stored
 # as bcrypt hashes. Unknown national ID and wrong password give the same 401.
 #
-# Registration claims a device. The caller must send the device's claim code
-# (core/auth.py claim_code), which the firmware only shows to a phone paired
-# over BLE. The claim is a single conditional UPDATE, so two requests cannot
-# both link the same device. A taken national ID and an already linked device
-# return the same 409. Both routes are rate limited per client IP.
+# Registration claims a device by challenge-response. The app gets a one-time
+# nonce from /claim-challenge, the paired device answers HMAC(device key,
+# nonce || device_id) over the encrypted BLE link, and /register checks it.
+# The nonce is consumed by the first attempt, right or wrong, and expires
+# after CLAIM_TTL_SEC. The claim itself is one conditional UPDATE, so two
+# requests cannot both link the same device. A taken national ID and an
+# already linked device return the same 409. All routes are rate limited per
+# client IP.
 
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core import config
-from app.core.auth import hash_device_key, issue_token, verify_claim
+from app.core.auth import hash_device_key, issue_token, verify_claim_response
 from app.core.database import get_db
 from app.core.ratelimit import RateLimiter
 import app.models as models
@@ -28,8 +32,37 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 register_limiter = RateLimiter(config.REGISTER_LIMIT, config.REGISTER_WINDOW_SEC)
 login_limiter = RateLimiter(config.LOGIN_LIMIT, config.LOGIN_WINDOW_SEC)
+challenge_limiter = RateLimiter(config.CHALLENGE_LIMIT, config.CHALLENGE_WINDOW_SEC)
 
 REGISTRATION_CONFLICT = "Registration failed: the device is already linked or these details are already in use"
+
+
+# ─── POST /v1/auth/claim-challenge ───────────────────────────────────────────
+
+@router.post("/claim-challenge", response_model=schemas.ClaimChallengeResponse,
+             dependencies=[Depends(challenge_limiter.dependency)])
+def claim_challenge(payload: schemas.ClaimChallengeRequest, db: Session = Depends(get_db)):
+    # Issued for any device ID, known or not, so this route does not reveal
+    # which devices exist.
+    now = datetime.utcnow()
+    db.query(models.ClaimChallenge).filter(models.ClaimChallenge.expires_at < now).delete()
+    nonce = secrets.token_hex(16)
+    db.add(models.ClaimChallenge(nonce=nonce, device_id=payload.device_id,
+                                 expires_at=now + timedelta(seconds=config.CLAIM_TTL_SEC), used=False))
+    db.commit()
+    return schemas.ClaimChallengeResponse(nonce=nonce, expires_in=config.CLAIM_TTL_SEC)
+
+
+def _consume_nonce(db: Session, device_id: str, nonce: str) -> bool:
+    """Marks the nonce used. True only for an unused, unexpired nonce issued for device_id."""
+    used = (db.query(models.ClaimChallenge)
+            .filter(models.ClaimChallenge.nonce == nonce,
+                    models.ClaimChallenge.device_id == device_id,
+                    models.ClaimChallenge.used.is_(False),
+                    models.ClaimChallenge.expires_at > datetime.utcnow())
+            .update({models.ClaimChallenge.used: True}, synchronize_session=False))
+    db.commit()
+    return used == 1
 
 
 # ─── POST /v1/auth/register ──────────────────────────────────────────────────
@@ -38,8 +71,10 @@ REGISTRATION_CONFLICT = "Registration failed: the device is already linked or th
              dependencies=[Depends(register_limiter.dependency)])
 def register_driver(payload: schemas.RegisterRequest, db: Session = Depends(get_db)):
     # 1. Proof of possession, before anything about the national ID is looked at.
-    if not verify_claim(payload.device_id, payload.claim_code):
-        raise HTTPException(status_code=403, detail="Device claim code is not valid")
+    #    The nonce is burnt first, so a wrong answer cannot be retried with it.
+    nonce_ok = _consume_nonce(db, payload.device_id, payload.nonce)
+    if not (nonce_ok and verify_claim_response(payload.device_id, payload.nonce, payload.claim_response)):
+        raise HTTPException(status_code=403, detail="Device claim is not valid or has expired")
 
     password_hash = pwd_context.hash(payload.password)
 
