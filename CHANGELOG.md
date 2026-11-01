@@ -33,10 +33,16 @@ enclosure in one repository.
 - BLE LE Secure Connections with MITM protection and bonding, static passkey
   `BLE_PASSKEY`, encrypted-only characteristic permissions. The app bonds
   before subscribing on Android. Not yet tested on the board.
+- BLE bonding policy (`BlePairingPolicy.h`, host-tested): fail closed when
+  `BLE_PASSKEY` is 0 or out of range (no BLE security or advertising, and a
+  `release` build environment that will not compile); a random passkey per
+  pairing shown on the OLED in display builds, the static passkey only as the
+  no-display fallback; new bonds only for 120 s after boot or a long button
+  press. Not yet tested on the board.
 - In-process rate limits on `/v1/auth/register` (5 per 10 min per IP) and
   `/v1/auth/login` (10 per 5 min per IP) and `/v1/auth/claim-challenge`
   (10 per 10 min per IP), 429 with `Retry-After`.
-- 23 backend access-control tests, 8 app tests, 1 website test, 2 host checks.
+- 23 backend access-control tests, 8 app tests, 1 website test, 3 host checks.
 - `include/config.h` falls back to `config.example.h`, so a fresh clone builds.
 - CI for firmware, host checks, API, website, app and secret scanning.
 - MIT licence, NOTICE for OpenStreetMap data, SECURITY.md.
