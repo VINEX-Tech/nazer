@@ -1,0 +1,8 @@
+{
+  "legacy":{"device_id":"TEST","timestamp":"2026-10-16T12:00:00Z","speed_kmh":65,"speed_limit_kmh":80,"lat":30,"lon":31,"satellites":7},
+  "telemetry":{"device_id":"TEST","timestamp":"2026-10-16T12:00:00Z","speed_kmh":90,"speed_limit_kmh":80,"lat":30,"lon":31,"gps_fix":true,"vehicle_mode":"car","over_limit":true,"fw":"2.0.0"},
+  "crash":{"event":"crash","event_id":"TEST_1","device_id":"TEST","timestamp":"2026-10-16T12:00:00Z","lat":30,"lon":31,"speed_kmh":40,"peak_g":5,"tilt_deg":80},
+  "cancelled":{"event":"crash_cancelled","event_id":"TEST_1"},
+  "config":{"config":{"speed_limit_kmh":100,"vehicle_mode":"car","contacts":["010XXXXXXXX"]}},
+  "violation":{"device_id":"TEST","timestamp":"2026-10-16T12:00:00Z","speed_kmh":90,"speed_limit_kmh":80,"duration_sec":12}
+}
