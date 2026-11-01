@@ -1,0 +1,16 @@
+.pio/
+.vscode/
+__pycache__/
+*.o
+*.d
+*.elf
+*.bin
+*.map
+*.a
+
+# Real device secrets: copy include/config.example.h to include/config.local.h
+include/config.local.h
+
+# LittleFS road pack and host fixture are release/test inputs.
+!data/limits.bin
+!test/host/*.bin
