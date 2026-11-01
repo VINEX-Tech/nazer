@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAZER Enclosure</title>
+<style>
+  :root { --bg:#141416; --panel:#1f1f23; --text:#e8e8ea; --muted:#9a9aa2; --accent:#ee5a24; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font:14px system-ui, sans-serif; }
+  #ui { position:fixed; top:12px; left:12px; background:var(--panel); padding:12px 14px; border-radius:10px;
+        box-shadow:0 4px 20px #0008; min-width:230px; }
+  #ui h1 { margin:0 0 8px; font-size:15px; color:var(--accent); }
+  #ui label { display:flex; gap:8px; align-items:center; margin:4px 0; cursor:pointer; }
+  #ui .row { margin-top:10px; color:var(--muted); font-size:12px; }
+  #ui input[type=range] { width:100%; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  #info { position:fixed; bottom:10px; left:12px; color:var(--muted); font-size:12px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="ui">
+  <h1>NAZER enclosure</h1>
+  <div id="toggles"></div>
+  <div class="row">Explode lid</div>
+  <input id="explode" type="range" min="0" max="80" value="0">
+  <div class="row">Cut-away (front → back, mm)</div>
+  <input id="cut" type="range" min="-15" max="100" value="-15">
+  <div class="row">Drag to rotate · scroll to zoom · right-drag to pan</div>
+</div>
+<div id="info">Outer 111.2 × 104.1 × 35.3 mm · PETG black, logo PLA Fire Engine Red + Orange</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+const PARTS = [
+  { file: "out/nazer_lid.stl",           name: "Lid (PETG black)",     color: 0x2a2a2e, lid: true,  on: true },
+  { file: "out/nazer_lid_logo_mark.stl", name: "Logo mark (PLA red)",  color: 0xd7262a, lid: true,  on: true },
+  { file: "out/nazer_lid_logo_text.stl", name: "Logo text (PLA orange)", color: 0xee5a24, lid: true, on: true },
+  { file: "out/nazer_base.stl",          name: "Base (PETG black)",    color: 0x3a3a40, lid: false, on: true },
+  { file: "out/fitcheck_dummies.stl",    name: "Board · cell · antenna (fit check)", color: 0x2e9e5b, lid: false, on: true },
+];
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141416);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 1, 2000);
+camera.up.set(0, 0, 1);
+camera.position.set(-90, -170, 140);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(51, 45, 15);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.3));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-100, -150, 200);
+scene.add(sun);
+const grid = new THREE.GridHelper(300, 30, 0x333338, 0x26262a);
+grid.rotation.x = Math.PI / 2;
+grid.position.set(51, 45, -3.05);
+scene.add(grid);
+
+const cutPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 15);     // keep y >= -constant
+const loader = new STLLoader();
+const toggles = document.getElementById("toggles");
+
+for (const p of PARTS) {
+  loader.load(p.file, geo => {
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.6, metalness: 0.05,
+      side: THREE.DoubleSide, clippingPlanes: [cutPlane] });
+    p.mesh = new THREE.Mesh(geo, mat);
+    p.mesh.visible = p.on;
+    scene.add(p.mesh);
+  });
+  const l = document.createElement("label");
+  l.innerHTML = `<input type="checkbox" ${p.on ? "checked" : ""}><span class="sw" style="background:#${p.color.toString(16).padStart(6, "0")}"></span>${p.name}`;
+  l.querySelector("input").onchange = e => { if (p.mesh) p.mesh.visible = e.target.checked; };
+  toggles.appendChild(l);
+}
+
+document.getElementById("explode").oninput = e => {
+  for (const p of PARTS) if (p.lid && p.mesh) p.mesh.position.z = +e.target.value;
+};
+document.getElementById("cut").oninput = e => {
+  // keep only y >= value: sliding right opens the box from the front
+  cutPlane.constant = -(+e.target.value);
+};
+cutPlane.constant = 15;
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => renderer.render(scene, camera));
+</script>
+</body>
+</html>
