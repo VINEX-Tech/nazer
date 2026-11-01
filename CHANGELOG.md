@@ -26,7 +26,12 @@ enclosure in one repository.
 - Backend: `/v1/admin/device/{live,track,events}` for the admin website.
 - App: sign-in and account creation in Settings, bearer token on tracking
   calls, BLE pairing code setting, clear 401 and 403 messages.
-- 12 backend access-control tests, 6 app tests, 1 website test.
+- Device claim codes: `/v1/auth/register` needs the device's claim code
+  (HMAC of the device key), which the firmware sends only to a BLE-paired
+  phone in its config reply.
+- In-process rate limits on `/v1/auth/register` (5 per 10 min per IP) and
+  `/v1/auth/login` (10 per 5 min per IP), 429 with `Retry-After`.
+- 19 backend access-control tests, 7 app tests, 1 website test.
 - `include/config.h` falls back to `config.example.h`, so a fresh clone builds.
 - CI for firmware, host checks, API, website, app and secret scanning.
 - MIT licence, NOTICE for OpenStreetMap data, SECURITY.md.
@@ -57,3 +62,12 @@ enclosure in one repository.
   Passwordless accounts can no longer sign in.
 - BLE commands (speed limit, mode, emergency contacts, crash cancel) were
   accepted from any nearby phone. They now need the pairing code.
+- Anyone who knew a device ID could link that device to their own account.
+  Registration now needs the device's claim code, and the claim is a single
+  conditional update so two requests cannot both win (409 for the loser).
+- Registration said when a national ID was already registered. A wrong claim
+  code is now rejected first (403), and a taken ID and a linked device return
+  the same 409.
+- Event IDs were global, so one device could block or probe another's. An
+  `event_id` must now start with the sending device's ID (403 otherwise).
+- Vehicle mode can no longer be changed by SMS (it sets the default limit).
