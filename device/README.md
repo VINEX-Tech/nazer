@@ -50,7 +50,7 @@ the placeholder key) and refuses all BLE commands (placeholder pairing code).
 | Setting in `config.local.h` | Meaning |
 |---|---|
 | `SERVER_HOST` | Backend origin, plain HTTP (the SIM800L cannot do TLS) |
-| `DEVICE_SECRET_KEY` | This device's key; the server must list it as `DEVICE_ID:key` in `NAZER_DEVICE_KEYS` |
+| `DEVICE_SECRET_KEY` | This device's key; the server must list it as `DEVICE_ID:key` in `NAZER_DEVICE_KEYS`. Also derives the claim code: HMAC-SHA256(key, `nazer-claim:` + device ID), 12 hex digits |
 | `BLE_PAIR_CODE` | 8 to 64 characters; entered once in the app's Settings |
 | `GSM_APN` | Carrier APN |
 
@@ -87,7 +87,8 @@ The other files in `test/` are on-device sketches for single modules. Select one
 | Write | `1c95d5e3-d8f7-413a-bf3d-7a2e5d7be87e`: JSON commands |
 
 The first command must be `{"cmd":"auth","code":"<BLE_PAIR_CODE>"}`. The device answers
-`{"auth":"ok"}` and sends its config, or `{"auth":"failed","reason":"wrong_code|locked|not_configured"}`.
+`{"auth":"ok"}` and sends its config (including `device_id` and the `claim_code` the app needs to
+register the device on the server), or `{"auth":"failed","reason":"wrong_code|locked|not_configured"}`.
 Other commands (`set_limit`, `set_mode`, `set_contacts`, `set_saver`, `cancel_crash`, `get_config`,
 `calibrate_imu`) are refused with `{"auth":"required"}` until then.
 
@@ -110,3 +111,4 @@ uvicorn server:app --host 0.0.0.0 --port 8080
 | Kalman noise values | Not tuned on a drive |
 | Battery percentage | Not measured (divider not fitted) |
 | Device traffic | Plain HTTP; see `../SECURITY.md` |
+| Claim code | Computed with mbedtls on the device; the server side is tested, the firmware side only builds (no host test) |
