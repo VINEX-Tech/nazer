@@ -78,9 +78,12 @@
 #define BLE_PAIR_CODE      "your_ble_pairing_code_here"
 
 // ---- BLE passkey (link encryption) ----
-// Six digits the phone asks for once when it bonds with the device
+// Only used when NAZER_HAS_DISPLAY is 0. With a display the device shows
+// a fresh random passkey for every pairing instead.
+// Six digits (1..999999) the phone asks for once when it bonds
 // (LE Secure Connections with MITM protection). Unique per device.
-// 0 is the placeholder: change it before giving the device to anyone.
+// 0 is the placeholder: with it BLE does not start at all, and the
+// `release` build environment refuses to compile.
 #define BLE_PASSKEY        0
 
 // ===========================================================

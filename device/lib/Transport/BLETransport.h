@@ -47,6 +47,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>          // Client Characteristic Configuration Descriptor (CCCD)
 #include <BLESecurity.h>
+#include "BlePairingPolicy.h"
 #include <ArduinoJson.h>
 #include "ITransport.h"
 #include "config.h"
@@ -148,6 +149,13 @@ public:
     void setParked(bool parked);
     bool popCommand(char* out, size_t len);         // next command written by the phone
 
+    // ---- Bonding (BlePairingPolicy.h) ----
+    // Called with each new pairing passkey (display builds) so main.cpp can show it.
+    static void setPasskeyDisplay(void (*show)(uint32_t));
+    static void openPairingWindow();             // e.g. after a long button press
+    static bool pairingWindowOpen();
+    bool ready() const { return _ready; }        // false: BLE not started (unconfigured)
+
     // Returns the BLE device name (e.g. "NAZER-A1B2")
     String deviceName() const { return _deviceName; }
 
@@ -159,6 +167,7 @@ private:
     NazerBLEServerCallbacks   _serverCallbacks;
     NazerCommandCallbacks     _cmdCallbacks;
 
+    bool     _ready           = false;
     uint8_t  _failures        = 0;
     uint32_t _lastNotifyMs    = 0;
 

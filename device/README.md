@@ -39,6 +39,7 @@ pip install platformio            # or the VS Code extension
 cd device
 cp include/config.example.h include/config.local.h   # then edit: WiFi, SERVER_HOST, keys
 pio run                           # builds nazer_esp32 and bringup
+pio run -e release                # refuses to build with the placeholder BLE_PASSKEY
 pio run -e nazer_esp32 -t upload
 pio run -e nazer_esp32 -t uploadfs   # writes data/ (the road pack) to LittleFS
 pio device monitor -b 115200
@@ -52,7 +53,7 @@ the placeholder key) and refuses all BLE commands (placeholder pairing code).
 |---|---|
 | `SERVER_HOST` | Backend origin, plain HTTP (the SIM800L cannot do TLS) |
 | `DEVICE_SECRET_KEY` | This device's key; the server must list it as `DEVICE_ID:key` in `NAZER_DEVICE_KEYS`. Also answers the server's claim challenge |
-| `BLE_PASSKEY` | 6-digit passkey for BLE bonding (LE Secure Connections); entered once in Android's pairing prompt |
+| `BLE_PASSKEY` | 1..999999, the static bonding passkey for builds without a display (the prototype). 0 (placeholder) means BLE does not start, and `pio run -e release` fails to compile. With `NAZER_HAS_DISPLAY 1` a random passkey is shown on the OLED for each pairing instead |
 | `BLE_PAIR_CODE` | 8 to 64 characters; entered once in the app's Settings |
 | `GSM_APN` | Carrier APN |
 
@@ -72,6 +73,7 @@ bash test/host/run_checks.sh
 | `test_power_policy.cpp` | Upload intervals, parked dwell, millis rollover, battery alerts |
 | `test_queue.cpp` | Upload queue: capacity, back-pressure, failed batches, wrap-around |
 | `test_ble_auth.cpp` | Pairing gate: placeholder codes fail closed, exact match, lockout, rollover, command gate |
+| `test_ble_pairing_policy.cpp` | Passkey range and placeholder, random passkey mapping, 120 s bonding window, long press, rollover |
 | `test_claim_response.cpp` | Claim answer: SHA-256 and RFC 4231 HMAC vectors, a vector shared with the server tests, bad nonces |
 
 `test/host/make_test_pack.py` rebuilds the synthetic fixtures with the same writer the server uses
@@ -89,9 +91,10 @@ The other files in `test/` are on-device sketches for single modules. Select one
 | Notify | `beb5483e-36e1-4688-b7f5-ea07361b26a8`: telemetry, events, config, auth replies, framed as `N/M\|json` chunks |
 | Write | `1c95d5e3-d8f7-413a-bf3d-7a2e5d7be87e`: JSON commands |
 
-All characteristics need an encrypted link: the phone first bonds with LE Secure Connections and
-the passkey `BLE_PASSKEY` (code in `BLETransport.cpp`; not yet tested on the board, see
-`../SECURITY.md`).
+All characteristics need an encrypted link: the phone first bonds with LE Secure Connections and a
+passkey (random and shown on the OLED in display builds, `BLE_PASSKEY` otherwise). New bonds are
+accepted for 120 s after boot, or after holding the encoder button for 3 s in display builds.
+See `BlePairingPolicy.h`. Not yet tested on the board, see `../SECURITY.md`.
 
 The first command must be `{"cmd":"auth","code":"<BLE_PAIR_CODE>"}`. The device answers
 `{"auth":"ok"}` and sends its config (including `device_id`), or
@@ -122,4 +125,4 @@ uvicorn server:app --host 0.0.0.0 --port 8080
 | Kalman noise values | Not tuned on a drive |
 | Battery percentage | Not measured (divider not fitted) |
 | Device traffic | Plain HTTP; see `../SECURITY.md` |
-| BLE bonding | LE Secure Connections code builds but has not been run on the board yet |
+| BLE bonding | LE Secure Connections, random passkey and bonding window build but have not been run on the board yet |

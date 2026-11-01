@@ -17,6 +17,18 @@
 #include "PowerPolicy.h"
 #include "BleAuth.h"
 #include "ClaimResponse.h"
+#include "BlePairingPolicy.h"
+#if NAZER_HAS_DISPLAY
+#include "Display.h"
+
+// New pairing passkey from the BLE stack: show it on the OLED for the user to type on the phone.
+static void showPasskey(uint32_t key) {
+    char line[16];
+    snprintf(line, sizeof(line), "%06lu", (unsigned long)key);
+    g_display.showMessage("BLE passkey", line);
+}
+static blepair::LongPress g_pairPress;
+#endif
 
 static SensorFusion     g_fusion;
 static TransportManager g_transport;   // BLE GATT server + offline violation queue
@@ -124,7 +136,13 @@ void setup() {
     }
     g_fusion.gps().begin();
 
-    g_transport.begin();   // BLE advertising starts here
+#if NAZER_HAS_DISPLAY
+    g_display.begin();
+    pinMode(ENC_BTN_PIN, INPUT_PULLUP);
+    BLETransport::setPasskeyDisplay(showPasskey);
+#endif
+    g_transport.begin();   // BLE advertising starts here (not at all if BLE_PASSKEY is unset)
+    if (!g_transport.ble().ready()) LOG_ERROR("MAIN", "BLE disabled: device unconfigured (BLE_PASSKEY)");
     Cellular::begin();     // modem task on core 0, returns immediately
 
     LOG_INFO("MAIN", "Boot complete");
@@ -134,6 +152,13 @@ void setup() {
 
 void loop() {
     uint32_t now = millis();
+#if NAZER_HAS_DISPLAY
+    // Hold the encoder button 3 s to accept new BLE bonds for another 120 s.
+    if (g_pairPress.update(digitalRead(ENC_BTN_PIN) == LOW, now)) {
+        BLETransport::openPairingWindow();
+        g_display.showMessage("BLE pairing", "open 120 s");
+    }
+#endif
 
     g_fusion.gps().update();
     g_fusion.update();

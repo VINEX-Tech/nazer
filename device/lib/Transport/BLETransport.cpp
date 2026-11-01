@@ -4,6 +4,59 @@
 
 #include "BLETransport.h"
 #include "Storage.h"
+#include <esp_random.h>
+
+// ---- Release builds must not ship the passkey placeholder ----
+#if defined(NAZER_RELEASE) && !NAZER_HAS_DISPLAY && ((BLE_PASSKEY) < 1 || (BLE_PASSKEY) > 999999)
+#error "Release build: set BLE_PASSKEY (1..999999) in include/config.local.h"
+#endif
+
+// ============================================================
+// Bonding policy: window for new bonds, passkey per pairing.
+// ============================================================
+static blepair::Window g_pairingWindow;
+static void (*g_passkeyShow)(uint32_t) = nullptr;
+
+class NazerSecurityCallbacks : public BLESecurityCallbacks {
+public:
+    // A central asks to pair. Refuse unless the bonding window is open.
+    bool onSecurityRequest() override {
+        if (!g_pairingWindow.isOpen(millis())) {
+            Serial.println("[W][BLE] Pairing refused: bonding window closed");
+            return false;
+        }
+#if NAZER_HAS_DISPLAY
+        uint32_t r = 0;
+        esp_fill_random(&r, sizeof(r));
+        uint32_t key = blepair::passkeyFromRandom(r);
+        esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &key, sizeof(key));
+        if (g_passkeyShow) g_passkeyShow(key);
+#endif
+        return true;
+    }
+    // The stack reports the passkey it uses: show it where the user can read it.
+    void onPassKeyNotify(uint32_t key) override {
+#if NAZER_HAS_DISPLAY
+        Serial.printf("[I][BLE] Pairing passkey: %06lu\n", (unsigned long)key);
+        if (g_passkeyShow) g_passkeyShow(key);
+#else
+        (void)key;   // static passkey: never printed
+#endif
+    }
+    uint32_t onPassKeyRequest() override { return 0; }      // this device has no keypad
+    bool onConfirmPIN(uint32_t) override { return false; }  // numeric comparison not offered
+    void onAuthenticationComplete(esp_ble_auth_cmpl_t r) override {
+        Serial.printf("[I][BLE] Bonding %s\n", r.success ? "complete" : "failed");
+    }
+};
+static NazerSecurityCallbacks g_securityCallbacks;
+
+void BLETransport::setPasskeyDisplay(void (*show)(uint32_t)) { g_passkeyShow = show; }
+void BLETransport::openPairingWindow() {
+    g_pairingWindow.open(millis());
+    Serial.printf("[I][BLE] Accepting new bonds for %lu s\n", (unsigned long)(blepair::WINDOW_MS / 1000));
+}
+bool BLETransport::pairingWindowOpen() { return g_pairingWindow.isOpen(millis()); }
 
 // ============================================================
 // NazerCommandCallbacks::onWrite()
@@ -51,23 +104,44 @@ BLETransport::~BLETransport() {
 bool BLETransport::connect() {
     Serial.printf("[I][BLE] Initialising BLE as \"%s\"\n", _deviceName.c_str());
 
+#if !NAZER_HAS_DISPLAY
+    // No screen to show a random passkey: the static BLE_PASSKEY is the
+    // fallback. Fail closed, like BleAuth: no valid passkey, no BLE at all.
+    if (!blepair::validStaticPasskey((long long)BLE_PASSKEY)) {
+        Serial.println("[E][BLE] Device unconfigured: BLE_PASSKEY must be 1..999999. "
+                       "BLE security and advertising NOT started.");
+        return false;
+    }
+#endif
+
     BLEDevice::init(_deviceName.c_str());
 
     // ---- Link security: LE Secure Connections, MITM protection, bonding ----
-    // The phone must pair with the static passkey BLE_PASSKEY (Android shows
-    // a passkey prompt) before it can subscribe or write: every characteristic
-    // below needs an encrypted, authenticated link. The pairing code and the
-    // claim answer therefore never cross the air in clear.
+    // The phone must bond with a passkey (Android shows a prompt) before it
+    // can subscribe or write: every characteristic below needs an encrypted,
+    // authenticated link, so the pairing code and the claim answer never
+    // cross the air in clear. New bonds are only accepted while the pairing
+    // window is open (BlePairingPolicy.h); NazerSecurityCallbacks enforces it.
     BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+    BLEDevice::setSecurityCallbacks(&g_securityCallbacks);
     BLESecurity* security = new BLESecurity();
-    security->setStaticPIN(BLE_PASSKEY);                       // also sets IO capability "display only"
+#if NAZER_HAS_DISPLAY
+    // A fresh random passkey is set for each pairing request (see
+    // NazerSecurityCallbacks::onSecurityRequest) and shown on the OLED.
+    uint32_t first = 0;
+    esp_fill_random(&first, sizeof(first));
+    security->setStaticPIN(blepair::passkeyFromRandom(first));
+#else
+    security->setStaticPIN(BLE_PASSKEY);                       // documented fallback, no display
+#endif
     security->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
     security->setCapability(ESP_IO_CAP_OUT);
     security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
     security->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
     uint8_t onlySpecified = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;   // refuse legacy / no-MITM pairing
     esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &onlySpecified, sizeof(onlySpecified));
-    if (BLE_PASSKEY == 0) Serial.println("[W][BLE] BLE_PASSKEY is the placeholder 000000: set a real one");
+    g_pairingWindow.open(millis());
+    Serial.printf("[I][BLE] Accepting new bonds for %lu s\n", (unsigned long)(blepair::WINDOW_MS / 1000));
 
     // Request 247-byte MTU so chunks are not truncated on early notifications.
     // The phone will negotiate down if it can't support 247, but most Android
@@ -119,6 +193,7 @@ bool BLETransport::connect() {
     Serial.printf("[I][BLE] Telemetry UUID: %s  (enable NOTIFY)\n", BLE_CHAR_TELEMETRY);
     Serial.printf("[I][BLE] Command UUID:   %s  (WRITE JSON cmd)\n", BLE_CHAR_COMMAND);
 
+    _ready = true;
     return true;
 }
 
@@ -228,6 +303,7 @@ bool BLETransport::popCommand(char* out, size_t len) {
 }
 
 void BLETransport::setParked(bool parked) {
+    if (!_ready) return;   // BLE never started (unconfigured passkey)
     BLEDevice::stopAdvertising();
     auto adv=BLEDevice::getAdvertising();
     adv->setMinInterval(parked ? 1600 : 160);
