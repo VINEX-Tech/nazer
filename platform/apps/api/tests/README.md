@@ -8,11 +8,12 @@ python -m pytest
 
 `conftest.py` sets the environment before the app is imported: a temporary SQLite file, one key per
 test device (`device_headers(device_id)` builds the header), a fixed token secret and admin
-credentials (`ADMIN`).
+credentials (`ADMIN`). `unclaimed_device()` hands out a configured device no test has registered yet,
+`device_claim_code(device_id)` gives its claim code, and rate limits reset before every test.
 
 | File | Covers |
 |---|---|
-| `test_access_control.py` | Driver tokens on `/v1/app/*`, per-device keys on `/v1/device/*`, admin tracking routes |
+| `test_access_control.py` | Driver tokens on `/v1/app/*`, per-device keys on `/v1/device/*`, admin tracking routes, claim codes, one-winner claims, no national ID probing, rate limits, event ID scoping |
 | `test_auth.py` | Password hashing, login, passwordless accounts rejected |
 | `test_admin.py` | Admin Basic auth |
 | `test_tracking.py` | Live, track and event queries, replays, timestamp handling, schema upgrade |

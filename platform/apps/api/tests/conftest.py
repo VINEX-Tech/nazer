@@ -15,7 +15,7 @@ TEST_DEVICE_IDS = [
     "track_event", "legacy_live", "v2_live", "invalid_mode", "offset_track",
     "v3_batch", "v3_events", "batch_same", "batch_concurrent", "v3_late",
     "auth_dev_a", "auth_dev_b",
-]
+] + [f"pool_{i}" for i in range(40)]   # unclaimed devices handed out by unclaimed_device()
 ADMIN = ("testadmin", "testpass123")
 
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_dir}/test.db"
@@ -34,8 +34,29 @@ def device_headers(device_id):
     return {"X-Device-Key": f"key-{device_id}"}
 
 
+def device_claim_code(device_id):
+    from app.core.auth import claim_code
+    return claim_code(device_id, f"key-{device_id}")
+
+
+_pool = iter(d for d in TEST_DEVICE_IDS if d.startswith("pool_"))
+
+
+def unclaimed_device():
+    """A configured device no test has claimed yet."""
+    return next(_pool)
+
+
 def admin_get(client, url, **kwargs):
     return client.get(url, auth=ADMIN, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    from app.routers.auth import login_limiter, register_limiter
+    register_limiter.reset()
+    login_limiter.reset()
+    yield
 
 
 @pytest.fixture()

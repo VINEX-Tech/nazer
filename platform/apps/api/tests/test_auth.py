@@ -1,13 +1,17 @@
 import uuid
 
+from conftest import device_claim_code, unclaimed_device
+
 
 def _register_payload(**overrides):
+    device_id = unclaimed_device()
     payload = {
         "full_name": "Test Driver",
         "national_id": uuid.uuid4().hex[:14],
         "car_plate": "ABC 123",
-        "device_id": f"NAZER_TEST_{uuid.uuid4().hex[:8]}",
+        "device_id": device_id,
         "password": "correct-horse",
+        "claim_code": device_claim_code(device_id),
     }
     payload.update(overrides)
     return payload

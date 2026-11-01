@@ -16,7 +16,7 @@ Backend API and admin website for the Nazer prototype tracker. Part of the Nazer
 | Prefix | Caller | Authentication |
 |---|---|---|
 | `/v1/device/*` | ESP32 firmware | `X-Device-Key`, one key per device |
-| `/v1/auth/*` | Flutter app | none (register, login) |
+| `/v1/auth/*` | Flutter app | none; register needs the device's claim code; both rate limited per IP |
 | `/v1/app/*` | Flutter app | `Authorization: Bearer <token>`; own device and records only |
 | `/v1/admin/*` | Admin website | HTTP Basic |
 | `/v1/speed-limits*` | App and website maps | none (OpenStreetMap-derived data) |
@@ -56,6 +56,6 @@ road limits.
 ## Tests
 
 ```bash
-cd apps/api && pip install -r requirements-dev.txt && python -m pytest   # 36 tests
+cd apps/api && pip install -r requirements-dev.txt && python -m pytest   # 43 tests
 cd apps/web && npm ci && npm test && npm run build                       # 11 tests
 ```

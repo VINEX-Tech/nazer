@@ -120,6 +120,27 @@ def device_key(x_device_key: str | None = Header(None)) -> str:
     return x_device_key
 
 
+CLAIM_CODE_LEN = 12
+
+
+def claim_code(device_id: str, key: str) -> str:
+    """Code that proves the caller holds the device (or its key).
+
+    HMAC-SHA256(device key, "nazer-claim:" + device_id), first 12 hex digits,
+    upper case. The firmware computes the same value and shows it to the app
+    only after BLE pairing, so knowing a device ID is not enough to claim it.
+    """
+    digest = hmac.new(key.encode(), f"nazer-claim:{device_id}".encode(), hashlib.sha256).hexdigest()
+    return digest[:CLAIM_CODE_LEN].upper()
+
+
+def verify_claim(device_id: str, code: str) -> bool:
+    key = config.DEVICE_KEYS.get(device_id)
+    expected = claim_code(device_id, key) if key else "0" * CLAIM_CODE_LEN
+    ok = hmac.compare_digest(expected.encode(), (code or "").strip().upper().encode())
+    return ok and key is not None
+
+
 def authorize_device(device_id: str, key: str) -> None:
     """403 when a valid key is used for a device it does not belong to."""
     expected = config.DEVICE_KEYS.get(device_id)

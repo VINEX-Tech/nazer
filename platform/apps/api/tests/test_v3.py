@@ -92,7 +92,7 @@ def test_v3_migration():
 def test_any_event(client):
     HEADERS = device_headers('v3_events')
     for kind in ['parked', 'moving', 'low_battery', 'gps_lost', 'gps_ok', 'future_kind']:
-        body = {'device_id': 'v3_events', 'event_id': f'v3_{kind}', 'event': kind, 'timestamp': '2026-10-20T10:00:00Z'}
+        body = {'device_id': 'v3_events', 'event_id': f'v3_events_{kind}', 'event': kind, 'timestamp': '2026-10-20T10:00:00Z'}
         assert client.post('/v1/device/event', json=body, headers=HEADERS).status_code == 200
 
 

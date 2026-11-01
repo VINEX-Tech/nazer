@@ -41,6 +41,12 @@ DEVICE_KEYS = parse_device_keys(os.environ.get("NAZER_DEVICE_KEYS", ""))
 TOKEN_SECRET = os.environ.get("NAZER_TOKEN_SECRET", "")
 TOKEN_TTL_HOURS = int(os.environ.get("NAZER_TOKEN_TTL_HOURS", "168"))
 
+# In-process rate limits for /v1/auth, per client IP: attempts per window.
+REGISTER_LIMIT = int(os.environ.get("NAZER_REGISTER_LIMIT", "5"))
+REGISTER_WINDOW_SEC = int(os.environ.get("NAZER_REGISTER_WINDOW_SEC", "600"))
+LOGIN_LIMIT = int(os.environ.get("NAZER_LOGIN_LIMIT", "10"))
+LOGIN_WINDOW_SEC = int(os.environ.get("NAZER_LOGIN_WINDOW_SEC", "300"))
+
 # CORS: allow app and website to call backend. Comma-separated list in the
 # CORS_ORIGINS env var; falls back to local Vite dev origins if unset.
 CORS_ORIGINS = [

@@ -191,9 +191,14 @@ def post_event(payload: schemas.EventRequest,
                device_key: str = Depends(verify_device_key),
                db: Session = Depends(get_db)):
     authorize_device(payload.device_id, device_key)
+    # Event IDs live in the sending device's namespace ("<device_id>_..."), so
+    # one device cannot take, block or probe another device's event IDs.
+    if not payload.event_id.startswith(f"{payload.device_id}_"):
+        raise HTTPException(status_code=403, detail="event_id must start with this device's ID and an underscore")
     existing = db.get(models.Event, payload.event_id)
     if existing and existing.device_id != payload.device_id:
-        raise HTTPException(status_code=409, detail="event_id already used by another device")
+        # Only reachable when one device ID is a prefix of another.
+        raise HTTPException(status_code=409, detail="event_id already used")
     if existing:
         return {"status": "ok", "event_id": existing.event_id}
     device = get_or_create_device(payload.device_id, device_key, db)

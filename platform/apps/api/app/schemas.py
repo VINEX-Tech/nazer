@@ -76,6 +76,8 @@ class RegisterRequest(BaseModel):
     phone:       Optional[str] = None
     device_id:   str
     password:    str = Field(min_length=8, max_length=72)   # bcrypt reads at most 72 bytes
+    # Proof that the caller holds the device: shown by the device to a paired phone.
+    claim_code:  str = Field(min_length=1, max_length=64)
 
 
 class RegisterResponse(BaseModel):
