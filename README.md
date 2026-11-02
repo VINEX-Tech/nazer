@@ -16,9 +16,9 @@
 
 [How it works](#how-it-works) · [Hardware](#hardware) · [Quick start](#quick-start) · [Status](#status) · [Roadmap](#roadmap)
 
-<img src="hardware/tracker-box/images/concept-in-car.jpg" width="760" alt="Nazer tracker box fitted in a car boot">
+<img src="hardware/tracker-box/images/concept-product.jpg" width="760" alt="Nazer tracker box with antenna">
 
-<sub>Concept image of the planned fitting, not a photo of a built unit.</sub>
+<sub>Concept image rendered from the CAD model, not a photo of a built unit.</sub>
 
 </div>
 
@@ -39,6 +39,12 @@ site, so a driver or a small fleet owner can see what the device knows and where
   rate-limited sign-in.
 - **Fleet view.** A React admin site with a live map, devices, drivers, violations and raw telemetry.
 - **Printable enclosure.** A sealed PETG box with a TPU gasket and a two-colour logo, STLs included.
+
+## In the vehicle
+
+<img src="hardware/tracker-box/images/concept-in-car.jpg" width="640" alt="Nazer tracker box fitted in a car boot">
+
+<sub>Concept image of the planned fitting, not a photo of a built unit.</sub>
 
 ## How it works
 
