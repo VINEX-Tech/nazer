@@ -4,7 +4,11 @@ Sealed 3D-printed enclosure for the Nazer prototype board, its 18650 cell and th
 It replaces the first enclosure in [`../enclosure`](../enclosure). Part of the Nazer monorepo; see
 the [root README](../../README.md).
 
-![Nazer tracker box](images/tracker-box.png)
+| Design | Fitted in a car boot |
+|---|---|
+| ![Nazer tracker box](images/tracker-box.png) | ![Nazer tracker box in a car boot](images/concept-in-car.jpg) |
+
+The second picture is a concept image of the planned fitting, not a photo of a built unit.
 
 ## Status
 
