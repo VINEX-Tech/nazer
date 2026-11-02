@@ -9,12 +9,12 @@ position on a map.
 
 **Status: Prototype / MVP.** It runs on one hand-built board and has not been road-tested.
 
-| Prototype board | Tracker box design | Fitted in a car |
-|---|---|---|
-| ![Hand-built prototype board: ESP32, SIM800L, GPS, MPU-6050, charger and 18650 cell on perfboard](docs/board-top-view.jpg) | ![Nazer tracker box](hardware/tracker-box/images/tracker-box.png) | ![Nazer tracker box in a car boot](hardware/tracker-box/images/concept-in-car.jpg) |
+| Tracker box design | Fitted in a car |
+|---|---|
+| ![Nazer tracker box](hardware/tracker-box/images/tracker-box.png) | ![Nazer tracker box in a car boot](hardware/tracker-box/images/concept-in-car.jpg) |
 
-The board is a photo of the real prototype. The box picture is the 3D design, and the car picture
-is a concept image of the planned fitting, not a photo of a built unit.
+The first picture is the 3D design. The second is a concept image of the planned fitting, not a
+photo of a built unit.
 
 ## Working now
 
@@ -50,15 +50,19 @@ moves. The screens say so.
 | Board | 102 x 80 mm perfboard, hand-wired |
 | Enclosure | [`hardware/tracker-box`](hardware/tracker-box): printable STLs, part list, materials and design notes |
 
+![Nazer wiring: ESP32 to GPS, IMU, SIM800L and the power chain](hardware/wiring.svg)
+
+Pins as set in `device/include/config.example.h`. If a wire on the board changes, change it there and
+in [`hardware/wiring.svg`](hardware/wiring.svg).
+
 ## Repository layout
 
 | Folder | Contents |
 |---|---|
 | `device/` | ESP32 firmware (PlatformIO, Arduino), host checks in `test/host/`, bench test server |
-| `hardware/` | Enclosures: `tracker-box/` (current sealed box, STLs and render) and `enclosure/` (first parametric box, Python) |
+| `hardware/` | Wiring diagram (`wiring.svg`) and enclosures: `tracker-box/` (current sealed box, STLs and render) and `enclosure/` (first parametric box, Python) |
 | `platform/` | `apps/api` FastAPI backend, `apps/web` React admin site, Docker Compose and nginx config |
 | `app/` | Flutter Android app |
-| `docs/` | Board photo |
 
 ```
 ESP32 device --BLE (bonded + pairing code)--> Flutter app --HTTPS, bearer token--> API
