@@ -1,5 +1,7 @@
 # Nazer
 
+<img src="docs/readme-icon.png" width="96" align="right" alt="Nazer icon">
+
 Nazer is a prototype vehicle tracker. An ESP32 board reads GPS and an IMU, looks up the road speed
 limit on the device from an OpenStreetMap pack, uploads its position over GPRS to a FastAPI backend,
 and talks to an Android app over Bluetooth Low Energy. An admin website shows devices and their live
@@ -7,9 +9,14 @@ position on a map.
 
 **Status: Prototype / MVP.** It runs on one hand-built board and has not been road-tested.
 
-![Hand-built prototype board: ESP32, SIM800L, GPS, MPU-6050, charger and 18650 cell on perfboard](docs/board-top-view.jpg)
+| Prototype board | Tracker box design | Fitted in a car |
+|---|---|---|
+| ![Hand-built prototype board: ESP32, SIM800L, GPS, MPU-6050, charger and 18650 cell on perfboard](docs/board-top-view.jpg) | ![Nazer tracker box](hardware/tracker-box/images/tracker-box.png) | ![Nazer tracker box in a car boot](hardware/tracker-box/images/concept-in-car.jpg) |
 
-## What works
+The board is a photo of the real prototype. The box picture is the 3D design, and the car picture
+is a concept image of the planned fitting, not a photo of a built unit.
+
+## Working now
 
 | Part | What is shown to work | How it is checked |
 |---|---|---|
@@ -18,7 +25,7 @@ position on a map.
 | Backend | FastAPI + SQLite. Receives device uploads, serves live position and track to the app and website. Per-device keys, driver bearer tokens, bcrypt-hashed passwords, challenge-response device claim, rate-limited sign-in, HTTP Basic admin auth. | 43 pytest tests |
 | Website | React admin pages: live tracking map, devices, drivers, violations, raw telemetry. | 11 node tests, `vite build` |
 | App | Flutter (Android). Live speed over BLE, live position from the server when out of BLE range, map, vehicle settings. Sign-in for Internet tracking, BLE pairing code. | `flutter analyze`, 66 tests |
-| Enclosure | Printed parametric box (PETG) for the board, battery and antenna. | Printed in PETG |
+| Enclosure | Sealed tracker box: PETG base and lid, two-colour logo inlay, TPU gasket and plugs. STLs in `hardware/tracker-box`. The first parametric box is in `hardware/enclosure`. | Base and spacers printed in PETG |
 
 The fine payment screens in the app are a **demo**: no payment provider is connected and no money
 moves. The screens say so.
@@ -30,6 +37,18 @@ moves. The screens say so.
 - A road test. The firmware has speed-violation logic, but it has not been tried on real roads.
 - A release signing key for the app (release builds use debug signing).
 - TLS in front of the API, and battery voltage measurement (the divider is not fitted on the board).
+
+## Hardware
+
+| Part | Used |
+|---|---|
+| Microcontroller | ESP32 |
+| GPS | GP-02 |
+| Motion | MPU-6050 IMU |
+| Cellular | SIM800L (GPRS), RP-SMA antenna |
+| Power | 18650 cell with charger board, USB-C charge port, slide switch |
+| Board | 102 x 80 mm perfboard, hand-wired |
+| Enclosure | [`hardware/tracker-box`](hardware/tracker-box): printable STLs, part list, materials and design notes |
 
 ## Repository layout
 
