@@ -14,7 +14,7 @@
 ![Flutter](https://img.shields.io/badge/app-Flutter-02569B?logo=flutter&logoColor=white)
 ![React](https://img.shields.io/badge/web-React-61DAFB?logo=react&logoColor=black)
 
-[How it works](#how-it-works) · [Hardware](#hardware) · [Quick start](#quick-start) · [Status](#status) · [Roadmap](#roadmap)
+**[Download the app](https://github.com/VINEX-Tech/nazer/releases/latest/download/nazer.apk)** · [How it works](#how-it-works) · [App and dashboard](#app-and-dashboard) · [Hardware](#hardware) · [Quick start](#quick-start) · [Status](#status) · [Roadmap](#roadmap)
 
 <img src="hardware/tracker-box/images/concept-product.jpg" width="760" alt="Nazer tracker box with antenna">
 
@@ -61,6 +61,26 @@ flowchart LR
 
 The SIM800L modem has no TLS, so device uploads are plain HTTP signed with a per-device key. See
 [SECURITY.md](SECURITY.md).
+
+## App and dashboard
+
+### Admin website
+
+<img src="docs/screenshots/web-01-tracking.png" width="760" alt="Live tracking">
+
+| Dashboard | Violations | Devices | Drivers |
+|---|---|---|---|
+| <img src="docs/screenshots/web-02-dashboard.png" width="200" alt="Dashboard"> | <img src="docs/screenshots/web-05-violations.png" width="200" alt="Violations"> | <img src="docs/screenshots/web-03-devices.png" width="200" alt="Devices"> | <img src="docs/screenshots/web-04-drivers.png" width="200" alt="Drivers"> |
+
+### Android app
+
+| Splash | Live speed | Vehicle map | Bluetooth search | Vehicle settings | Settings |
+|---|---|---|---|---|---|
+| <img src="docs/screenshots/app-01-splash.png" width="130" alt="Splash"> | <img src="docs/screenshots/app-03-home-live-speed.png" width="130" alt="Live speed"> | <img src="docs/screenshots/app-04-map.png" width="130" alt="Vehicle map"> | <img src="docs/screenshots/app-07-bluetooth-search.png" width="130" alt="Bluetooth search"> | <img src="docs/screenshots/app-05-vehicle-settings.png" width="130" alt="Vehicle settings"> | <img src="docs/screenshots/app-08-settings.png" width="130" alt="Settings"> |
+
+<sub>Real screenshots against a local backend filled with a made-up fleet: three demo vehicles driving short routes in central Cairo, with made-up drivers and plates. The phone app runs in the emulator, so Bluetooth screens show no device.</sub>
+
+**Download the app:** [`nazer.apk`](https://github.com/VINEX-Tech/nazer/releases/latest/download/nazer.apk) (Android 10 or newer, signed with a debug key).
 
 ## Hardware
 
