@@ -36,7 +36,7 @@ moves. The screens say so.
 | Folder | Contents |
 |---|---|
 | `device/` | ESP32 firmware (PlatformIO, Arduino), host checks in `test/host/`, bench test server |
-| `hardware/` | Parametric enclosure (Python, `manifold3d`) and its STL files |
+| `hardware/` | Enclosures: `tracker-box/` (current sealed box, STLs and render) and `enclosure/` (first parametric box, Python) |
 | `platform/` | `apps/api` FastAPI backend, `apps/web` React admin site, Docker Compose and nginx config |
 | `app/` | Flutter Android app |
 | `docs/` | Board photo |

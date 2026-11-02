@@ -3,6 +3,9 @@
 Parametric enclosure for the prototype board, written in Python with `manifold3d`. Printed in PETG.
 Part of the Nazer monorepo; see the [root README](../README.md).
 
+The current design is the sealed [tracker box](tracker-box/README.md), with a gasket and TPU plugs.
+The parametric box below was the first enclosure.
+
 All dimensions are in millimetres and come from caliper measurements of the hand-built board (see
 the header of `enclosure/nazer_enclosure.py`). The box holds the 102 x 80 mm perfboard, the 18650
 cell, the USB-C charge port and slide switch on the front edge, and an antenna bay at the back for
